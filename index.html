@@ -1,0 +1,871 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>动物对决</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#090e17;color:#f3f6fb;font:16px system-ui,sans-serif}main{max-width:1120px;margin:auto;padding:20px}header,.hud,.foot,.controls{display:flex;align-items:center;justify-content:space-between;gap:12px}h1{margin:0;font-size:24px}header span,.foot{color:#aab7cc}.arena{margin-top:14px;position:relative;background:#111c2c;border:1px solid #34455e;border-radius:16px;overflow:hidden}.hud{position:absolute;top:0;left:0;right:0;padding:14px;background:linear-gradient(#080f1ded,transparent);pointer-events:none}.side{width:38%}.right{text-align:right}.bar{height:10px;border-radius:6px;background:#34445c;margin-top:5px;overflow:hidden}.bar i{display:block;height:100%;background:#4ee0d5}.right .bar i{margin-left:auto;background:#ff887e}.time{text-align:center;font:700 23px monospace;min-width:74px}.time small{display:block;font:12px system-ui;color:#afbdd1}canvas{display:block;width:100%;height:auto}.panel{position:absolute;inset:0;display:grid;place-content:center;text-align:center;background:#0b1322c9;padding:18px}.panel[hidden]{display:none}.panel h2{font-size:clamp(23px,6vw,52px);margin:0}.panel p{margin:7px 0 15px;color:#ced8e9}.actions{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}button{font:700 15px system-ui;border:1px solid #49617c;background:#24344c;color:white;border-radius:10px;padding:10px 15px;cursor:pointer;touch-action:none}button.primary{background:#76eee0;color:#10222b;border-color:transparent}button:active{transform:translateY(2px)}.foot{margin-top:12px;flex-wrap:wrap;font-size:14px}.controls{display:none;margin-top:12px}.controls div{display:flex;gap:9px}.controls button{min-width:56px;min-height:48px}@media(pointer:coarse){.controls{display:flex}}@media(max-width:600px){main{padding:8px}.hud{padding:7px;font-size:12px}.time{font-size:18px}.panel p{font-size:13px}.panel button{padding:6px 8px}}
+.header-actions{display:flex;gap:8px;align-items:center}.header-actions button[hidden],#exit-result[hidden]{display:none}#exit-panel{z-index:2}#exit-panel label{display:block;margin:0 0 12px}#exit-panel select{font:inherit;color:#fff;background:#24344c;border:1px solid #49617c;border-radius:8px;padding:5px 8px}#exit-result{color:#ffbd95;margin:0 0 12px}
+#version-button{position:absolute;right:12px;bottom:12px;padding:5px 9px;color:#c5d6ee;font:700 13px monospace}
+#version-button[hidden],.player-marker[hidden]{display:none}
+#version-log{z-index:2}
+.player-marker{position:absolute;z-index:1;pointer-events:none;transform:translate(-50%,-100%);padding:4px 8px;border-radius:6px;background:#122132;border:1px solid currentColor;font:800 16px monospace;animation:player-flash .55s ease-in-out 2}
+#p1-marker{color:#76eee0}#p2-marker{color:#ff9b8f}
+@keyframes player-flash{50%{opacity:.35}}
+@media(prefers-reduced-motion:reduce){.player-marker{animation:none}}
+#room-code{font:700 15px monospace;letter-spacing:.16em;text-transform:uppercase;width:130px;padding:9px;border:1px solid #49617c;border-radius:8px;background:#15243a;color:#fff}
+.room-cards{display:flex;justify-content:center;gap:10px;margin:0 0 14px}
+.room-cards[hidden]{display:none}
+.room-card{display:grid;gap:5px;min-width:110px;padding:10px;background:#17263a;border:1px solid #435775;border-radius:9px;text-align:left}
+.room-card strong{color:#76eee0}.room-card:nth-child(2) strong{color:#ff9b8f}
+.room-card span{color:#c8d6e9;font-size:13px}
+.room-card[data-ready="true"] span{color:#a3f6b4}</style>
+<main><header><h1>动物对决</h1><span id="mode">在线好友房</span><div class="header-actions"><button id="return-home" type="button" hidden>返回主界面</button><button id="audio-toggle" type="button" aria-pressed="false">静音</button></div></header>
+<section class="arena"><canvas id="field" width="960" height="540" aria-label="横版竞技场"></canvas>
+<div class="hud"><div class="side"><b id="blue">居居侠 · 空手</b><div class="bar"><i id="bbar"></i></div></div><div class="time"><span id="clock">3:00</span><small id="score">0 : 0</small></div><div class="side right"><b id="red">小狗大王 · 空手</b><div class="bar"><i id="rbar"></i></div></div></div>
+<div class="panel" id="panel"><h2 id="title">动物对决</h2><p id="message">打倒对手，或截住装备怪换个打法。</p><div id="exit-result" role="status" hidden></div><div id="room-cards" class="room-cards" hidden></div><div class="actions" id="actions"></div><button id="version-button" type="button" aria-label="查看更新日志" hidden></button></div>
+<span class="player-marker" id="p1-marker" hidden>P1</span><span class="player-marker" id="p2-marker" hidden>P2</span>
+<div class="panel" id="version-log" role="dialog" aria-modal="true" aria-labelledby="version-heading" hidden>
+ <h2 id="version-heading">更新日志</h2><div id="version-entries"></div>
+ <div class="actions"><button id="version-close" class="primary" type="button">关闭</button></div>
+</div>
+<div class="panel" id="exit-panel" role="dialog" aria-modal="true" aria-labelledby="exit-title" hidden>
+ <h2 id="exit-title">退出对战？</h2><p>游戏中退出将判定为整场失败。</p>
+ <label>退出玩家 <select id="exit-player"><option value="0">居居侠</option><option value="1">小狗大王</option></select></label>
+ <div class="actions"><button id="exit-cancel" class="primary" type="button">取消</button><button id="exit-confirm" type="button">确定退出</button></div>
+</div></section>
+<div class="controls"><div><button data-key="KeyA">左</button><button data-key="KeyD">右</button></div><div><button data-key="KeyW">跳</button><button data-key="KeyJ">攻击</button></div></div>
+<div class="foot"><span>A / D 移动 · W 跳 · J 攻击</span><span>也可用 ← / → 移动 · ↑ 跳 · L 攻击</span></div></main>
+<script>
+const el=id=>document.getElementById(id), canvas=el('field'), g=canvas.getContext('2d');
+const keys=new Set(), weapons=[
+ {name:'空手',damage:8,cd:.35,range:29,tint:'#ffffff',wind:.07,push:92},
+ {name:'平射轻弩',damage:12,mobDamage:24,cd:.65,reaches:216,speed:432,tint:'#86f0ff',wind:.1,push:105},
+ {name:'斜射弩',damage:12,mobDamage:24,cd:.75,reaches:216,speed:396,tint:'#bfa4ff',angle:.61,wind:.12,push:105},
+ {name:'重锤',damage:20,mobDamage:32,cd:.95,range:47,tint:'#ffcc77',wind:.25,push:425}
+];
+const platforms=[[0,474,405],[555,474,405],[125,397,212],[623,397,212],[310,321,340],[140,245,186],[634,245,186],[294,167,372]];
+const monsterRoute=[
+ {edge:291,landing:245},
+ {walk:175},
+ {edge:329,landing:321},
+ {stop:446},
+ {edge:307,landing:397},
+ {edge:122,landing:474},
+ {stop:386},
+ {edge:410,landing:548}
+];
+const paint=['#4ee0d5','#ff887e'];
+let players=[], mobs=[], loot=[], shots=[], fx=[], elapsed=0,waveAt=0,waveCount=0,round=1,wins=[0,0],side=0,bot=false,active=false,last=0,now=0,safe=540,transition=null;
+let exitPrompt=false;
+const audioEvents=[];
+const releaseNotes=[
+ {version:'v1.1.5', notes:'首页只保留创建和加入在线好友房。'},
+ {version:'v1.1.4', notes:'在线版首页新增加入好友房入口，可用房间码加入。'},
+ {version:'v1.1.3', notes:'加入在线好友房、准备状态和自动联机对战，保留本机双人。'},
+ {version:'v1.0.3', notes:'每波小怪数量从 4 只增加到 6 只。'},
+ {version:'v1.0.2', notes:'小怪先横穿平台再落层。延长中层和底层的拦截路线。'},
+ {version:'v1.0.1', notes:'P1、P2 位置标识改为在开场倒计时结束后闪烁。'},
+ {version:'v1.0.0', notes:'双人同屏版本。加入主菜单版本日志和回合开始时的 P1、P2 位置提示。'}
+];
+el('version-button').textContent=releaseNotes[0].version;
+for(const {version,notes} of releaseNotes){
+ const item=document.createElement('p');
+ item.textContent=version+' · '+notes;
+ el('version-entries').append(item);
+}
+el('version-button').onclick=()=>{
+ unlockAudio();sound('click');el('version-log').hidden=false;el('version-close').focus();
+};
+el('version-close').onclick=()=>{
+ sound('click');el('version-log').hidden=true;el('version-button').focus();
+};
+function showPlayerMarkers(show){
+ for(let i=0;i<2;i++){
+  const marker=el('p'+(i+1)+'-marker');
+  marker.hidden=!show;
+  marker.textContent=online?.you===i?'你 · P'+(i+1):'P'+(i+1);
+  if(show){
+   marker.style.left=(100*players[i].x/canvas.width)+'%';
+   marker.style.top=(100*(players[i].y-51)/canvas.height)+'%';
+  }
+ }
+}
+const soundCues={
+ click:[['square',740,.085,.16,460]],
+ hip:[['triangle',195,.14,.22,57],['noise',610,.095,.16,170]],
+ punch:[['triangle',360,.095,.21,105],['noise',1250,.085,.22,350]],
+ jump:[['square',240,.16,.15,690]],
+ land:[['triangle',135,.095,.16,54],['noise',360,.08,.10,170]],
+ footstep:[['noise',340,.055,.075,160]],
+ monsterSpawn:[['triangle',360,.12,.12,510]],
+ wave:[['triangle',250,.1,.095,430],['triangle',500,.12,.09,590,.08]],
+ heal:[['sine',370,.16,.21,690],['triangle',880,.2,.16,1170,.08]],
+ upgrade:[['triangle',440,.1,.19],['triangle',660,.12,.18,660,.08],['triangle',990,.22,.22,990,.16]],
+ waterHit:[['noise',1150,.19,.25,330],['square',210,.12,.12,78]],
+
+ bow:[['triangle',930,.095,.095,390],['noise',1500,.06,.055,530]],
+ hammer:[['triangle',180,.14,.15,55],['noise',600,.12,.1,140]],
+ monsterHit:[['square',235,.085,.09,135]],
+ playerHit:[['sawtooth',175,.15,.125,68],['noise',420,.085,.09,150]],
+ armor:[['triangle',910,.18,.13,360],['triangle',1300,.09,.08,610]],
+ monsterDown:[['triangle',510,.13,.13,160],['square',250,.07,.045,140,.055]],
+ playerDown:[['triangle',255,.37,.19,58],['noise',350,.16,.09,70]],
+ pit:[['triangle',440,.28,.17,64]],
+ pickup:[['triangle',660,.1,.11],['triangle',990,.16,.11,990,.07]],
+ warning:[['square',490,.1,.09],['square',490,.14,.085,490,.17]],
+ water:[['noise',1100,.64,.22,460],['triangle',105,.48,.18,60],['square',460,.12,.09,300,.04]],
+ waterUrgent:[['noise',1400,.46,.18,590],['sawtooth',180,.19,.17,110],['square',570,.11,.11,370,.12]],
+ tick:[['triangle',450,.085,.09]],
+ go:[['triangle',870,.19,.13]],
+ roundWin:[['triangle',523,.12,.12],['triangle',784,.21,.13,784,.09]],
+ draw:[['triangle',440,.15,.1],['triangle',330,.19,.1,330,.12]],
+ victory:[['triangle',523,.15,.13],['triangle',659,.15,.13,659,.11],['triangle',784,.15,.14,784,.22],['triangle',1047,.34,.14,1047,.33]]
+};
+let audio=null, master=null, noise=null, muted=false, nextWaterCue=155, resuming=false;
+const pendingSounds=[];
+function unlockAudio(){
+ const Audio=globalThis.AudioContext||globalThis.webkitAudioContext||globalThis.window?.AudioContext;
+ if(!Audio)return;
+ try{
+  if(!audio){
+   audio=new Audio();
+   master=audio.createGain();master.gain.value=muted?0:.68;master.connect(audio.destination);
+   noise=audio.createBuffer(1,Math.ceil(audio.sampleRate*.75),audio.sampleRate);
+   const data=noise.getChannelData(0);
+   for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
+  }
+  if(audio.state!=='running'&&!resuming){
+   resuming=true;
+   Promise.resolve(audio.resume()).then(()=>{
+    if(audio.state==='running')for(const cue of pendingSounds.splice(0))sound(...cue);
+   }).catch(()=>{}).finally(()=>{resuming=false});
+  }
+ }catch{audio=null;resuming=false;}
+}
+function sound(name,delay=0){
+ if(globalThis.authoritative){audioEvents.push([name,delay]);return;}
+ if(!audio||muted)return;
+ if(audio.state!=='running'){
+  if(name==='click'||name==='go'||name==='tick'){
+   if(pendingSounds.length>=4)pendingSounds.shift();
+   pendingSounds.push([name,delay]);
+  }
+  return;
+ }
+ for(const [shape,from,length,volume,to=from,offset=0] of soundCues[name]){
+  const t=audio.currentTime+delay+offset;
+  const gain=audio.createGain();gain.connect(master);
+  gain.gain.setValueAtTime(.001,t);
+  gain.gain.linearRampToValueAtTime(volume,t+.008);
+  gain.gain.exponentialRampToValueAtTime(.001,t+length);
+  let voice;
+  if(shape==='noise'){
+   voice=audio.createBufferSource();voice.buffer=noise;
+   const filter=audio.createBiquadFilter();filter.type='lowpass';
+   filter.frequency.setValueAtTime(from,t);filter.frequency.exponentialRampToValueAtTime(to,t+length);
+   voice.connect(filter);filter.connect(gain);voice.onended=()=>{filter.disconnect();gain.disconnect()};
+  }else{
+   voice=audio.createOscillator();voice.type=shape;voice.connect(gain);
+   voice.frequency.setValueAtTime(from,t);voice.frequency.exponentialRampToValueAtTime(to,t+length);
+   voice.onended=()=>gain.disconnect();
+  }
+  voice.start(t);voice.stop(t+length);
+ }
+}
+function toggleAudio(){
+ muted=!muted;
+ if(!muted){unlockAudio();sound('click');}
+ else pendingSounds.length=0;
+ if(master)master.gain.value=muted?0:.68;
+ el('audio-toggle').textContent=muted?'开启音效':'静音';
+ el('audio-toggle').setAttribute('aria-pressed',String(muted));
+}
+el('audio-toggle').onclick=toggleAudio;
+const tips=[
+ '创建好友房后，把邀请链接或房间码发给朋友。',
+ '双方都能抢黄标怪的掉落，碰到就拾取。',
+ '连续捡到同款武器会升级，最高 Lv.3。',
+ '击倒 3 只普通怪，可获得一层清怪护盾。',
+ '绿色血包回复 25 点血，蓝色胸甲能抵挡一次伤害。',
+ '掉进坑里会扣半管血，跨坑时留意对手的重锤。',
+ '最后 30 秒留意缩圈提示，提前找路上高台。',
+ '双方都点准备后，会自动倒数开局。'
+];
+let previousTip=-1;
+function menu(exitMessage=''){
+ el('version-button').hidden=false;
+ el('version-log').hidden=true;
+ showPlayerMarkers(false);
+ el('return-home').hidden=true;
+ el('exit-result').hidden=!exitMessage;
+ el('exit-result').textContent=exitMessage;
+ el('mode').textContent='在线好友房';
+ const available=tips.filter((_,i)=>i!==previousTip);
+ const tip=available[Math.floor(Math.random()*available.length)];
+ previousTip=tips.indexOf(tip);
+ const buttons=[['创建好友房',()=>enterRoom('create')],['加入好友房',joinByCode]];
+ panel('动物对决','tips：'+tip,buttons);
+}
+function panel(title,message,buttons){
+ el('room-cards').hidden=true;
+ el('title').textContent=title;el('message').textContent=message;el('actions').replaceChildren();
+ buttons.forEach(([label,action],i)=>{const b=document.createElement('button');b.textContent=label;if(!i)b.className='primary';b.onclick=()=>{unlockAudio();sound('click');action()};el('actions').append(b)});el('panel').hidden=false;
+}
+function openExit(){
+ if(el('return-home').hidden||exitPrompt)return;
+ unlockAudio();sound('click');
+ exitPrompt=true;keys.clear();
+ el('exit-player').value=String(online?.you??0);
+ el('exit-player').disabled=Boolean(online);
+ el('exit-panel').hidden=false;
+ el('exit-cancel').focus();
+}
+function closeExit(){
+ exitPrompt=false;keys.clear();el('exit-panel').hidden=true;
+}
+el('return-home').onclick=openExit;
+el('exit-cancel').onclick=()=>{
+ if(!exitPrompt)return;
+ unlockAudio();sound('click');closeExit();el('return-home').focus();
+};
+el('exit-confirm').onclick=()=>{
+ if(!exitPrompt)return;
+ if(online){closeExit();roomCommand('leave');return;}
+ const loser=el('exit-player').value==='1'?1:0;
+ const names=['居居侠','小狗大王'];
+ unlockAudio();sound('click');sound('victory',.12);
+ closeExit();active=false;transition=null;
+ players=[];mobs=[];loot=[];shots=[];fx=[];
+ elapsed=0;safe=540;round=1;wins=[0,0];hud();
+ menu(names[loser]+'退出并判负，'+names[1-loser]+'获胜。');
+};
+function start(ai){
+ el('version-button').hidden=true;
+ el('return-home').hidden=false;el('exit-result').hidden=true;
+ if(typeof window!=='undefined')unlockAudio();bot=ai;round=1;wins=[0,0];side=Math.random()<.5?0:1;el('mode').textContent='在线好友房';begin();}
+function player(i,s){return {i,s,x:s?790:170,y:474,v:0,kick:0,face:s?-1:1,hp:100,w:0,level:1,armor:false,clear:0,ground:true,swing:0,cd:0,inv:0,stun:0,walk:0,lastMove:-1,stepAt:0,waterHitAt:0,waterFlash:0,inWater:false,ai:0,think:0}}
+function begin(){
+ players=[player(0,side),player(1,1-side)];mobs=[];loot=[];shots=[];fx=[];elapsed=0;nextWaterCue=155;safe=540;waveAt=0;waveCount=0;active=false;transition={kind:'countdown',remaining:3};panel('3','第 '+round+' 回合',[]);showPlayerMarkers(false);hud();
+}
+function spawn(){
+ const count=6;
+ const equip=waveCount===0||Math.random()<.5?Math.floor(Math.random()*count):-1;
+ for(let i=0;i<count;i++){const type=waveCount===0?0:(i===2?1:i===4?2:0);
+ mobs.push({isMob:true,x:480,y:167,v:0,hp:waveCount===0?16:type===1?48:24,maxHp:waveCount===0?16:type===1?48:24,pause:0,opening:waveCount===0,speed:[90,65,115][type],type,equip:i===equip,mirror:Math.random()<.5,point:0,wait:i*.65});
+ }waveCount++;waveAt=elapsed+12;if(waveCount>1)sound('wave');
+}
+function burst(x,y,tint,n=9){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,s=55+Math.random()*145;fx.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,t:.13+Math.random()*.29,tint})}}
+function damage(t,n,x,push=0,attacker=null){
+ if(t.hp<=0||t.inv>0)return;
+ const armored=!t.isMob&&t.armor;
+ if(armored){t.armor=false;n=Math.ceil(n/2);burst(t.x,t.y-20,'#7baaff',12)}
+ t.hp=Math.max(0,t.hp-n);
+ sound(t.hp<=0?(t.isMob?'monsterDown':'playerDown'):armored?'armor':t.isMob?'monsterHit':'playerHit');
+ burst(t.x,t.y-14,t.isMob?'#ffc375':paint[t.i]);
+ if(t.isMob){
+  if(t.hp>0)t.pause=Math.max(t.pause,.45);
+  if(!t.hp&&!t.equip&&attacker){
+   attacker.clear=Math.min(3,attacker.clear+1);
+   grantClearArmor(attacker);
+  }
+  if(!t.hp&&t.equip){
+   const pit=t.y>425&&t.x>365&&t.x<595;
+   const roll=Math.random();
+   const kind=t.opening||roll<.6?'weapon':roll<.8?'health':'armor';
+   loot.push({x:pit?480:t.x,y:pit?425:t.y-15,v:0,float:pit,kind,w:kind==='weapon'?1+Math.floor(Math.random()*3):0});
+  }
+ }else if(push){t.kick=(Math.sign(t.x-x)||1)*push;t.stun=push>300?.22:.12;t.v=Math.min(t.v,push>300?-110:-30);}
+}
+function grantClearArmor(p){
+ if(p.clear<3||p.armor||p.hp<=0)return;
+ p.clear=0;p.armor='clear';sound('armor');burst(p.x,p.y-20,'#7baaff',16);
+}
+function swing(p){if(p.cd>0||p.stun>0||!p.hp)return;p.inv=0;p.cd=weapons[p.w].cd;p.swing=weapons[p.w].wind;p.attack=p.w;p.attackLevel=p.level;}
+function fire(p){
+ const w=weapons[p.attack],multiplier=1+.25*(p.attackLevel-1),x=p.x+p.face*17,y=p.y-21;burst(x,y,w.tint,5);sound(w.speed?'bow':p.attack===3?'hammer':p.i?'punch':'hip');
+ if(w.speed){
+  const angle=w.angle??0;
+  shots.push({x,y,vx:Math.cos(angle)*w.speed*p.face,vy:-Math.sin(angle)*w.speed,w,multiplier,life:w.reaches/w.speed,owner:p.i});
+  return;
+ }
+ for(const t of [...players,...mobs]){
+  if(t===p||t.hp<=0||t.wait>0)continue;
+  const fistVsMob=t.isMob&&p.attack===0;
+  const heavyVsMob=t.isMob&&p.attack===3;
+  const dx=(t.x-p.x)*p.face;
+  if(Math.abs(t.y-p.y)<(fistVsMob||heavyVsMob?58:36)&&dx>= (fistVsMob?-34:-8)&&dx<(heavyVsMob?73:fistVsMob?70:w.range)){
+   damage(t,Math.round((t.isMob?(w.mobDamage??w.damage):w.damage)*multiplier),p.x,w.push,p);
+  }
+ }
+}
+function land(o,old){for(const [x,y,width] of platforms){if(old<=y&&o.y>=y&&o.x>=x&&o.x<=x+width){o.y=y;o.v=0;return true}}return false}
+function controls(p,dt){
+ if(!p.i||!bot){
+  const [l,r,j,a]=p.i?['ArrowLeft','ArrowRight','ArrowUp','KeyL']:['KeyA','KeyD','KeyW','KeyJ'];
+  return [+keys.has(r)-+keys.has(l),keys.has(j),keys.has(a)];
+ }
+ const enemy=players[0];p.think-=dt;
+ if(p.think<=0){p.think=.13;p.ai=loot.filter(o=>o.y<safe).sort((a,b)=>Math.abs(a.x-p.x)-Math.abs(b.x-p.x))[0]||(!p.w&&mobs.find(m=>m.equip&&m.wait<=0&&m.hp>0&&Math.abs(m.y-p.y)<105))||enemy}
+ const target=p.y>safe-12?{x:p.x<480?275:685,y:140}:p.ai||enemy;
+ const ascend=target.y<p.y-38;
+ const steps=[[474,230,730],[397,325,635],[321,290,670],[245,310,650]];
+ const step=steps.find(([y])=>Math.abs(p.y-y)<10);
+ const aim=ascend&&step?step[p.x<480?1:2]:target.x;
+ const d=aim-p.x, close=Math.abs(target.x-p.x)<(p.w===1||p.w===2?185:38);
+ const jump=(ascend&&Math.abs(d)<28)||(p.y>465&&((p.x>360&&p.x<413&&d>16)||(p.x>547&&p.x<600&&d<-16)));
+ return [Math.abs(d)>9&&(!close||ascend||target!==enemy)?Math.sign(d):0,jump,close&&Math.abs(target.y-p.y)<(p.w===2?123:36)];
+}
+function update(dt){
+ const previousTime=elapsed;elapsed+=dt;
+ if(previousTime<150&&elapsed>=150)sound('warning');
+ if(elapsed>=nextWaterCue&&elapsed<180){
+  const urgent=elapsed>=165;
+  sound(urgent?'waterUrgent':'water');
+  nextWaterCue=elapsed+(urgent?.64:1.05);
+ }
+ safe=elapsed<155?540:540-(540-201)*Math.min(1,(elapsed-155)/15);
+ if(elapsed>=waveAt&&elapsed<150)spawn();
+ for(const p of players){
+  p.inv=Math.max(0,p.inv-dt);p.stun=Math.max(0,p.stun-dt);p.cd-=dt;
+  const [dir,jump,attack]=controls(p,dt);
+  if(p.stun<=0){if(dir){p.face=dir;p.x+=dir*216*dt;p.walk+=dt;p.lastMove=now;if(p.ground&&elapsed>=p.stepAt){sound('footstep');p.stepAt=elapsed+.24}}if(jump&&p.ground){p.v=-435;p.ground=false;sound('jump');burst(p.x,p.y,'#9bb7ce',4)}if(attack)swing(p)}
+  p.x=Math.max(15,Math.min(945,p.x+p.kick*dt));p.kick*=Math.pow(.075,dt);
+  const prev=p.y,wasGround=p.ground;p.v+=980*dt;p.y+=p.v*dt;
+  const fallingSpeed=p.v;p.ground=p.v>=0&&land(p,prev);
+  if(p.ground&&!wasGround&&fallingSpeed>120)sound('land');
+  if(p.swing>0){p.swing-=dt;if(p.swing<=0)fire(p)}
+  if(p.y>529){
+   p.hp=Math.max(0,p.hp-50);sound(p.hp>0?'pit':'playerDown');burst(p.x,505,paint[p.i],18);p.x=safe<475?(p.s?584:376):(p.s?790:170);p.y=safe<475?167:474;p.v=0;p.kick=0;p.inv=.85;p.stun=0;p.swing=0;
+  }
+  p.waterFlash=Math.max(0,p.waterFlash-dt);
+  const touchingWater=safe<540&&p.y>safe;
+  if(touchingWater&&p.hp>0){
+   p.hp=Math.max(0,p.hp-17*dt);
+   if(!p.hp)sound('playerDown');
+   else if(!p.inWater||elapsed>=p.waterHitAt){
+    sound('waterHit');
+    p.waterHitAt=elapsed+.48;
+    p.waterFlash=.21;
+    burst(p.x,Math.max(safe,p.y-8),'#8be7ff',12);
+   }
+  }
+  p.inWater=touchingWater;
+ }
+ if(previousTime<1.2)showPlayerMarkers(elapsed<1.2);
+ for(const m of mobs){
+  const waiting=m.wait>0;
+  m.wait-=dt;if(m.wait>0||m.hp<=0)continue;
+  if(waiting&&m.equip)sound('monsterSpawn');
+  if(m.pause>0)m.pause-=dt;
+  else{
+   const step=monsterRoute[m.point], target=step.edge??step.stop??step.walk;
+   const x=m.mirror?960-target:target;
+   const distance=x-m.x;
+   if(distance)m.face=Math.sign(distance);
+   m.x+=Math.sign(distance)*Math.min(Math.abs(distance),m.speed*dt);
+   if(m.x===x){
+    if(step.edge!==undefined){
+     const prev=m.y;
+     m.v+=980*dt;m.y+=m.v*dt;
+     if(land(m,prev))m.point++;
+     else if(m.y>=step.landing)m.hp=0;
+    }else{
+     m.point++;
+     if(step.stop===386)m.pause=m.equip?2:1.2;
+     else if(step.stop!==undefined&&m.equip)m.pause=1.25;
+    }
+   }
+  }
+  if(m.y>safe)m.hp=0;
+  for(const p of players)if(m.hp>0&&Math.abs(p.x-m.x)<24&&Math.abs(p.y-m.y)<27&&p.inv<=0){damage(p,m.opening?3:m.type===1?10:6,m.x);p.inv=.65;}
+ }
+ mobs=mobs.filter(m=>m.hp>0);
+ for(const s of shots){
+  s.x+=s.vx*dt;s.y+=s.vy*dt;s.life-=dt;
+  for(const t of [...players,...mobs]){
+   if(s.life<=0||t.i===s.owner||t.hp<=0||t.wait>0)continue;
+   const radius=t.isMob?(t.type===1?17:12):16;
+   const allowance=t.isMob?12:2;
+   if(Math.abs(s.x-t.x)>=(t.isMob?radius+allowance:17)||Math.abs(s.y-(t.y-radius))>=radius+allowance)continue;
+   damage(t,Math.round((t.isMob?s.w.mobDamage:s.w.damage)*s.multiplier),s.x-s.vx*dt,s.w.push,players[s.owner]);
+   s.life=0;
+  }
+ }
+ shots=shots.filter(s=>s.life>0);
+ loot=loot.filter(o=>{
+  if(!o.float){const prev=o.y+12;o.v+=740*dt;o.y+=o.v*dt;const proxy={x:o.x,y:o.y+12,v:o.v};if(land(proxy,prev)){o.y=proxy.y-12;o.v=0}}
+  if(o.y>safe||o.y>529)return false;
+  const contacts=players.filter(p=>p.hp>0&&Math.hypot(o.x-p.x,o.y-(p.y-18))<30).sort((a,b)=>Math.hypot(o.x-a.x,o.y-a.y+18)-Math.hypot(o.x-b.x,o.y-b.y+18));
+  if(contacts.length){
+   const p=contacts[0];
+   let cue='pickup';
+   if(o.kind==='health'){p.hp=Math.min(100,p.hp+25);cue='heal';}
+   else if(o.kind==='armor'){p.armor='pickup';cue='armor';}
+   else if(p.w===o.w){if(p.level<3)cue='upgrade';p.level=Math.min(3,p.level+1);}
+   else{p.w=o.w;p.level=1;}
+   sound(cue);burst(o.x,o.y,lootColor(o),16);return false;
+  }
+  return true;
+ });
+ for(const p of players)grantClearArmor(p);
+ if(players.some(p=>p.hp<=0)||elapsed>=180)end();hud();
+}
+function end(){
+ showPlayerMarkers(false);active=false;const [a,b]=players.map(p=>Math.ceil(p.hp));const win=a===b?-1:a>b?0:1;if(win>=0)wins[win]++;
+ const match=wins.some(n=>n===2)||round===3;
+ sound(match?(wins[0]===wins[1]?'draw':'victory'):win<0?'draw':'roundWin',.17);
+ const name=i=>i===0?'居居侠':'小狗大王';
+ if(match){el('return-home').hidden=true;const winner=wins[0]===wins[1]?'整场平局':name(wins[0]>wins[1]?0:1)+'赢得比赛';panel(winner,'最终比分 '+wins.join(' : '),[['再来一场',()=>start(bot)],['返回菜单',menu]]);}
+ else{
+  panel(win<0?'本回合平局':name(win)+'赢下回合','比分 '+wins.join(' : '),[]);
+  transition={kind:'result',remaining:1.4};
+ }
+}
+function advanceTransition(dt){
+ transition.remaining-=dt;
+ if(transition.kind==='countdown'){
+  if(transition.remaining>0){
+   const digit=Math.ceil(transition.remaining);
+   if(transition.digit!==digit){transition.digit=digit;sound('tick');}
+   el('title').textContent=digit;return;
+  }
+  transition=null;active=true;el('panel').hidden=true;showPlayerMarkers(true);sound('go');spawn();return;
+ }
+ if(transition.remaining<=0){
+  round++;
+  side=round===2?1-side:Math.floor(Math.random()*2);
+  begin();
+ }
+}
+function hud(){
+ for(const [i,id,bar] of [[0,'blue','bbar'],[1,'red','rbar']]){const p=players[i];el(id).textContent=(i?'小狗大王':'居居侠')+' · '+weapons[p?.w||0].name+(p?.w?' Lv.'+p.level:'')+(p?.armor==='pickup'?' · 胸甲':p?.armor==='clear'?' · 清怪护盾':'')+' · 清怪 '+(p?.clear??0)+'/3';el(bar).style.width=(p?.hp??100)+'%'}
+ const t=Math.max(0,Math.ceil(180-elapsed));el('clock').textContent=Math.floor(t/60)+':'+String(t%60).padStart(2,'0');el('clock').style.color=t<=30?'#ffab86':'';el('score').textContent=wins.join(' : ')+' · 第 '+round+' 回合';
+}
+function lootColor(o){return o.kind==='health'?'#71f5a3':o.kind==='armor'?'#7baaff':weapons[o.w].tint}
+function rect(x,y,w,h,color){g.fillStyle=color;g.fillRect(x,y,w,h)}
+function circle(x,y,r,c){g.fillStyle=c;g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill()}
+const animalHeads=[
+ [
+  '..oo......oo...',
+  '.oppo....oppo..',
+  '.opppo..opppo..',
+  '.oppppooppppo..',
+  '..opppppppppo..',
+  '.opllllllllpo..',
+  '.opllllollppo..',
+  '.oplllpolppoo..',
+  '.oppppppposssso',
+  '..oppppposdsdso',
+  '...oopppossssso',
+  '.....ooooooooo.'
+ ],
+ [
+  '....o.o.o......',
+  '....ogogo......',
+  '...ogggggo.....',
+  '..ooooooooo....',
+  '.owwwwwwwwwo...',
+  'owwwwwwwwwwwo..',
+  'owwwooowwwowo..',
+  'owwowwowwwwwwo.',
+  'owwwoowwwwwwdoo',
+  '.owwwwwwwwwwo..',
+  '..owwwwwwwwo...',
+  '....ooooooo....'
+ ]
+];
+const spriteColors={
+ o:'#211e37',p:'#f59ba7',l:'#ffbfbc',s:'#e37b91',d:'#5d344e',w:'#fff6df',g:'#ffbd55'
+};
+function drawWeapon(id,x,y){
+ const tint=weapons[id].tint;
+ g.save();
+ g.translate(x,y);
+ if(id===3){
+  rect(-12,-2,19,5,'#302432');rect(-11,-1,18,3,'#b87e50');
+  rect(3,-8,12,17,'#342738');rect(4,-7,10,15,tint);
+  rect(5,-6,8,3,'#fff1c2');rect(5,5,8,2,'#9e634a');
+ }else if(id===2){
+  // Tall, swept bow with the entire stock tilted upward.
+  g.rotate(-.61);
+  rect(-14,-2,24,5,'#28223c');rect(-12,-1,21,3,'#bf9eea');
+  rect(1,-10,4,5,'#46316b');rect(4,-6,4,5,tint);
+  rect(4,2,4,5,tint);rect(1,6,4,5,'#46316b');
+  rect(-1,-8,1,17,'#f1dcff');rect(5,-1,8,2,'#ffdefd');
+  rect(11,-2,2,4,'#e7a6ef');
+ }else{
+  // Broad teal limbs, long stock and a visible bolt.
+  rect(-14,-3,25,7,'#20283d');rect(-13,-2,21,4,'#a77957');
+  rect(0,-8,5,5,'#3c7790');rect(4,-6,6,4,tint);
+  rect(4,2,6,4,tint);rect(0,4,5,5,'#3c7790');
+  rect(-2,-7,2,15,'#d4faff');rect(5,-1,10,2,'#ecffff');
+ }
+ g.restore();
+}
+function drawPigHipStrike(preparing,armor){
+ const thrust=preparing?1:8;
+ const outline=spriteColors.o;
+ rect(-17,-9,23,9,outline);
+ rect(-15,-7,7,7,'#a65367');
+ rect(0,-7,7,7,'#bd6274');
+ rect(-12,-26,27+thrust,19,outline);
+ rect(-10,-24,23+thrust,15,'#ec8c9b');
+ rect(7+thrust,-21,9,10,outline);
+ rect(5+thrust,-20,9,8,'#ffbfbc');
+ rect(14+thrust,-23,5,4,'#a65367');
+ rect(17+thrust,-25,2,5,outline);
+ rect(-19,-25,18,6,armor?'#b9d4f8':'#198c83');
+ rect(-2,-24,12,3,armor?'#536e9a':'#61e6cb');
+ const head=animalHeads[0];
+ head.forEach((line,row)=>{
+  for(let col=0;col<line.length;col++){
+   const ink=spriteColors[line[col]];
+   if(ink)rect(-3-col*2,-29+row*2,2,2,ink);
+  }
+ });
+ if(!preparing){
+  rect(25,-24,11,2,'#61e6cb');
+  rect(29,-19,10,2,'#fff6df');
+  rect(25,-14,8,2,'#61e6cb');
+ }
+}
+function drawAnimal(p){
+ const x=Math.round(p.x), y=Math.round(p.y);
+ const dog=p.i===1, trim=dog?'#d7613b':'#198c83', bright=dog?'#ffb75e':'#61e6cb';
+ const hit=p.stun>0, airborne=!p.ground;
+ const stepping=now-p.lastMove<.11;
+ const stride=airborne?3:stepping?Math.round(Math.sin(p.walk*32)*3):0;
+ const swing=p.swing>0, striking=p.attack!==undefined&&p.cd>weapons[p.attack].cd-weapons[p.attack].wind-.10;
+ const basicAttack=striking&&p.attack===0;
+ const pigStrike=basicAttack&&!dog;
+ const dogCrouch=basicAttack&&dog;
+ const blink=p.inv>0&&Math.floor(now*16)%2===0;
+ if(p.inv>0)circle(x,y-22,25,'#c6e8ff35');
+ g.save();
+ g.translate(x,y);
+ g.scale(p.face,1);
+ if(blink)g.globalAlpha=.64;
+ if(p.waterFlash>0)g.filter=Math.floor(p.waterFlash*30)%2?'brightness(1.8) saturate(1.2)':'brightness(1.15)';
+ const lift=airborne?2:0;
+ const recoil=hit?-3:0;
+ const dy=lift+(stepping&&!airborne?Math.abs(stride)%2:0)-(dogCrouch?9:0);
+ if(pigStrike)drawPigHipStrike(swing,p.armor==='pickup');
+ else{
+  rect(-12+stride,-9-lift,9,9,spriteColors.o);
+  rect(3-stride,-9-lift,9,9,spriteColors.o);
+  rect(-11+stride,-6-lift,7,5,dog?'#e8d6b8':'#a65367');
+  rect(4-stride,-6-lift,7,5,dog?'#fff6df':'#bd6274');
+  rect(-16,-21-dy,5,14,spriteColors.o);
+  rect(-15,-20-dy,4,10,trim);
+  rect(-12,-23-dy,24,17,spriteColors.o);
+  rect(-10,-22-dy,20,14,dog?'#fff6df':'#ec8c9b');
+  rect(-11,-21-dy,20,5,trim);
+  rect(-9,-20-dy,15,2,bright);
+  const head=animalHeads[p.i];
+  for(let row=0;row<head.length;row++){
+   const line=head[row];
+   for(let col=0;col<line.length;col++){
+    const ink=spriteColors[line[col]];
+    if(ink)rect(-15+col*2+recoil,-45+row*2-dy,2,2,ink);
+   }
+  }
+  if(p.armor==='pickup'){
+   rect(-13,-19-dy,8,7,'#b9d4f8');rect(5,-19-dy,8,7,'#b9d4f8');
+   rect(-8,-17-dy,16,10,'#536e9a');rect(-7,-17-dy,14,3,'#e3efff');
+   rect(-5,-12-dy,10,3,'#88a8d3');
+  }
+  const hand=striking?(swing?8:dogCrouch?23:20):11;
+  rect(hand,-19-dy,8,8,spriteColors.o);
+  rect(hand+1,-18-dy,6,6,dog?'#fff6df':'#ffb1b8');
+  if(p.w)drawWeapon(p.w,hand+11,-15-dy);
+  if(dogCrouch&&!swing){
+   rect(hand+10,-20-dy,7,2,bright);
+   rect(hand+13,-16-dy,4,2,'#fff6df');
+  }
+ }
+ g.restore();
+ if(p.armor==='clear'){
+  g.strokeStyle='#83f6fc64';g.lineWidth=5;g.beginPath();g.ellipse(x,y-23,25,28,0,0,Math.PI*2);g.stroke();
+  g.strokeStyle='#b6fffb';g.lineWidth=1.5;g.stroke();
+ }
+}
+const monsterSprites=[
+ // Moss beetle
+ [
+  '.....oo.....',
+  '..ooooaoo...',
+  '.oggggggaoo.',
+  'oggggggaalgo',
+  'ogghggaaloao',
+  'ogggggaalald',
+  '.oggaaallao.',
+  '..ooooooo...'
+ ],
+ // Barrel boar
+ [
+  '...oo.......o...',
+  '..obbo..ooooo...',
+  '.obbbooobbbbo...',
+  '.obbbbbbbboo....',
+  'obbbhbbbbbbbo...',
+  'obbbbbbbobbooooo',
+  'obbbhbbbbboaalaa',
+  '.obbbbbbbboalooa',
+  '..obbbbaoowaaao.',
+  '...oooooooooo...'
+ ],
+ // Lantern bat
+ [
+  '....oo..oo....',
+  '...ovoooovo...',
+  '...ovvvvvvo...',
+  '..ovvhvhvvvo..',
+  '..ovvovovvvo..',
+  '...ovlllvvo...',
+  '....oolloo....',
+  '.....oooo.....'
+ ]
+];
+const monsterInk={
+ o:'#231c34',g:'#429a83',a:'#c38467',l:'#ffd17d',h:'#adf1a6',
+ d:'#613a50',b:'#945b69',w:'#fff0c8',v:'#8060b2'
+};
+function drawMonster(m){
+ const large=m.type===1, flyer=m.type===2;
+ const x=Math.round(m.x), y=Math.round(m.y);
+ const bob=flyer?Math.round(Math.sin(now*12)*2):0;
+ const face=m.face??(m.mirror?1:-1);
+ const sprite=monsterSprites[m.type];
+ rect(x-12,y-(large?32:27),24,3,'#111728');
+ rect(x-12,y-(large?32:27),24*m.hp/m.maxHp,3,m.equip?'#ffdc71':'#a9a1e8');
+ if(m.equip){
+  rect(x-5,y-(large?45:40),10,9,'#ffdc71');
+  rect(x-1,y-(large?44:39),2,4,'#4c2c35');
+  rect(x-1,y-(large?38:33),2,1,'#4c2c35');
+ }
+ g.save();
+ g.translate(x,y+bob);
+ g.scale(face,1);
+ if(flyer){
+  const flap=Math.sin(now*18)>0?-5:3;
+  for(const side of [-1,1]){
+   rect(side*12-6,-17+flap,12,7,'#231c34');
+   rect(side*13-5,-16+flap,10,4,'#bfa4f2');
+   rect(side*17-4,-14+flap,8,3,'#594578');
+  }
+ }else{
+  const stride=m.pause>0||m.v>0?0:Math.round(Math.sin(now*(large?13:19)+m.x*.06)*2);
+  rect(-8+stride,-5,6,5,'#231c34');
+  rect(3-stride,-5,6,5,'#231c34');
+  rect(-7+stride,-4,4,3,large?'#bb7a75':'#63b99a');
+  rect(4-stride,-4,4,3,large?'#bb7a75':'#63b99a');
+ }
+ const width=sprite[0].length;
+ sprite.forEach((line,row)=>{
+  for(let col=0;col<line.length;col++){
+   const ink=monsterInk[line[col]];
+   if(ink)rect(col*2-width,-5-sprite.length*2+row*2,2,2,ink);
+  }
+ });
+ g.restore();
+}
+function draw(dt){
+ const sky=g.createLinearGradient(0,0,0,540);sky.addColorStop(0,'#263958');sky.addColorStop(1,'#111728');rect(0,0,960,540,sky);
+ for(let i=0;i<34;i++){circle((i*157+24)%960,(i*71+13)%380,i%5===0?2:1,'#92abc16b')}
+ g.fillStyle='#1a2940';g.beginPath();g.moveTo(0,425);for(let i=0;i<=12;i++)g.lineTo(i*80,250+(i*73)%115);g.lineTo(960,540);g.lineTo(0,540);g.fill();
+ for(let i=0;i<11;i++){const x=i*98-20,y=308+(i*47)%93;rect(x,y,49,540-y,'#142036');rect(x-6,y-7,61,9,'#1a2840');rect(x+19,y+20,8,20,'#a1775870')}
+ rect(405,475,150,65,'#0c1221');rect(405,531,150,9,'#8b4378');
+ for(const [x,y,w] of platforms){rect(x,y,w,16,'#273653');rect(x,y,w,4,'#7d9aba');rect(x,y+5,w,2,'#4d6889');for(let j=12;j<w-10;j+=32)rect(x+j,y+10,15,2,'#384d6d');}
+ g.strokeStyle='#b4a2ff';g.lineWidth=2;g.beginPath();g.ellipse(480,146,25,9,0,0,Math.PI*2);g.stroke();
+ for(const m of mobs)if(m.wait<=0)drawMonster(m);
+ for(const o of loot){const tint=lootColor(o),y=o.y+Math.sin(now*5)*3;circle(o.x,y,15,tint+'42');
+  if(o.kind==='health'){rect(o.x-9,y-3,18,6,tint);rect(o.x-3,y-9,6,18,tint)}
+  else if(o.kind==='armor'){g.fillStyle=tint;g.beginPath();g.moveTo(o.x-8,y-8);g.lineTo(o.x+8,y-8);g.lineTo(o.x+6,y+4);g.lineTo(o.x,y+10);g.lineTo(o.x-6,y+4);g.fill()}
+  else drawWeapon(o.w,o.x,y)}
+ for(const p of players)if(p.hp>0)drawAnimal(p);
+ for(const s of shots){g.strokeStyle=s.w.tint;g.lineWidth=3;g.beginPath();g.moveTo(s.x-s.vx*.027,s.y-s.vy*.027);g.lineTo(s.x,s.y);g.stroke();}
+ if(safe<540){rect(0,safe,960,540-safe,'#ed498651');rect(0,safe,960,3,'#ff688d');
+  for(let x=0;x<960;x+=24){
+   const crest=Math.round(Math.sin(x*.043+now*5)*3);
+   rect(x,safe+crest,13,2,'#ffd0e3af');
+  }}
+ if(elapsed>=150&&active){g.font='bold 18px system-ui';g.textAlign='center';g.fillStyle='#ffd4b3';g.fillText(elapsed<155?'安全区即将上移':'安全区上移 · 往上层走',480,90)}
+ for(const f of fx){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vy+=150*dt;f.t-=dt;if(f.t>0){g.globalAlpha=Math.min(1,f.t*5);circle(f.x,f.y,2,f.tint)}}g.globalAlpha=1;fx=fx.filter(f=>f.t>0);
+}
+const allowed=['KeyA','KeyD','KeyW','KeyJ','ArrowLeft','ArrowRight','ArrowUp','KeyL'];
+addEventListener('keydown',e=>{if(exitPrompt){if(e.code==='Escape'){el('exit-cancel').click();e.preventDefault()}return}if(allowed.includes(e.code)){if(!e.repeat&&(!audio||audio.state!=='running'))unlockAudio();keys.add(e.code);e.preventDefault()}});
+addEventListener('keyup',e=>keys.delete(e.code));addEventListener('blur',()=>keys.clear());
+for(const b of document.querySelectorAll('[data-key]')){
+ b.onpointerdown=e=>{if(exitPrompt)return;unlockAudio();b.setPointerCapture(e.pointerId);keys.add(b.dataset.key)};
+ b.onpointerup=b.onpointercancel=b.onlostpointercapture=()=>keys.delete(b.dataset.key);
+}
+const onlineSupported=typeof location!=='undefined'&&/^https?:$/.test(location.protocol);
+let online=null, roomBusy=false;
+const roomNames=['居居侠','小狗大王'];
+async function roomCall(payload){
+ const response=await fetch('/api/room',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+ const data=await response.json();
+ if(!response.ok){const error=new Error(data.error);error.status=response.status;throw error;}
+ return data;
+}
+function roomMessage(text){
+ panel('在线好友房',text,[['返回主界面',()=>roomHome()]]);
+}
+function roomHome(message=''){
+ online=null;roomBusy=false;
+ keys.clear();active=false;transition=null;players=[];mobs=[];loot=[];shots=[];fx=[];
+ elapsed=0;safe=540;round=1;wins=[0,0];
+ if(onlineSupported){
+  sessionStorage.removeItem('animal-duel-room');
+  history.replaceState(null,'',location.pathname);
+ }
+ hud();menu(message);
+}
+function joinByCode(){
+ if(!onlineSupported){roomMessage('当前是本地文件预览。请通过联机服务器网址打开，再输入房间码加入。');return;}
+ const input=document.createElement('input');
+ input.id='room-code';
+ input.placeholder='6 位房间码';
+ input.maxLength=6;
+ input.autocomplete='off';
+ input.spellcheck=false;
+ input.setAttribute('aria-label','房间码');
+ const join=()=>{
+  const code=input.value.trim().toUpperCase();
+  if(!/^[A-HJ-NP-Z2-9]{6}$/.test(code)){
+   el('message').textContent='请输入有效的 6 位房间码。';input.focus();return;
+  }
+  enterRoom('join',code);
+ };
+ panel('加入好友房','输入朋友分享的房间码。',[['加入',join],['返回主界面',()=>roomHome()]]);
+ el('actions').prepend(input);
+ input.addEventListener('keydown',event=>{event.stopPropagation();if(event.key==='Enter')join();});
+ input.focus();
+}
+async function enterRoom(action,code){
+ if(!onlineSupported){roomMessage('当前是本地文件预览。请通过联机服务器网址打开，再创建好友房。');return;}
+ if(roomBusy)return;
+ roomBusy=true;roomMessage(action==='create'?'正在创建房间…':'正在加入房间…');
+ try{
+  const data=await roomCall({action,code});
+  if(!roomBusy){await roomCall({action:'leave',code:data.code,token:data.token});return;}
+  attachRoom(data);
+ }catch(error){if(roomBusy)roomMessage(error.message||'房间服务器暂时无法连接。');}
+ finally{roomBusy=false;}
+}
+function attachRoom(data){
+ const connection={code:data.code,token:data.token,you:data.you,after:0,view:'',busy:false};
+ online=connection;
+ sessionStorage.setItem('animal-duel-room',JSON.stringify(connection));
+ history.replaceState(null,'','?room='+data.code);
+ renderRoom(data);
+ pollRoom(connection);
+}
+function playerInput(){
+ const held=(...codes)=>codes.some(code=>keys.has(code));
+ return [held('KeyA','ArrowLeft'),held('KeyD','ArrowRight'),held('KeyW','ArrowUp'),held('KeyJ','KeyL')];
+}
+async function pollRoom(connection){
+ if(online!==connection)return;
+ try{
+  const data=await roomCall({action:'poll',code:connection.code,token:connection.token,after:connection.after,input:playerInput()});
+  if(online!==connection)return;
+  connection.failedSince=0;
+  el('mode').textContent='好友房 '+connection.code;
+  renderRoom(data);
+  if(data.phase==='finished')return;
+ }catch(error){
+  if(online!==connection)return;
+  if(error.status===403||error.status===404){roomHome(error.message);return;}
+  connection.failedSince ||= Date.now();
+  el('mode').textContent='连接中断 · 正在重连';
+  if(Date.now()-connection.failedSince>16000){roomHome('连接超时，已退出好友房。');return;}
+ }
+ setTimeout(()=>pollRoom(connection),connection.phase==='playing'?38:300);
+}
+async function roomCommand(action,fields={}){
+ const c=online;
+ if(!c||c.busy)return;
+ c.busy=true;
+ try{
+  const data=await roomCall({action,code:c.code,token:c.token,...fields});
+  if(online!==c)return;
+  if(action==='leave'){roomHome(data.result||'已离开好友房。');return;}
+  renderRoom(data);
+ }catch(error){
+  if(action==='leave')roomHome('已离开，服务器将在断线超时后结算。');
+  else el('message').textContent=error.message||'连接失败，请重试。';
+ }finally{c.busy=false;}
+}
+function renderRoom(data){
+ const c=online;
+ if(!c||c.phase==='finished'||(c.phase==='playing'&&data.phase==='lobby'))return;
+ c.phase=data.phase;
+ el('version-button').hidden=true;
+ el('exit-result').hidden=true;
+ el('mode').textContent='好友房 '+data.code;
+ el('return-home').hidden=data.phase!=='playing';
+ if(data.phase==='lobby'){
+  const status=data.players.map(p=>!p?'等待加入':!p.connected?'正在重连':p.ready?'已准备':'已加入 · 未准备');
+  const mine=data.players[c.you].ready;
+  const view=status.join('|');
+  if(c.view!==view){
+   c.view=view;
+   const waiting=!data.players[1]?'等待好友加入':mine?'等待对方准备':'两人准备后自动开局';
+   panel(waiting,'房间 '+data.code,[ [mine?'取消准备':'准备',()=>roomCommand('ready',{ready:!mine})],
+    ['复制邀请链接',async()=>{
+     try{await navigator.clipboard.writeText(location.href);el('title').textContent='邀请链接已复制';}
+     catch{el('title').textContent='复制浏览器地址发给好友';}
+    }],['离开房间',()=>roomCommand('leave')] ]);
+   const cards=el('room-cards');
+   cards.replaceChildren();
+   status.forEach((text,i)=>{
+    const card=document.createElement('div');
+    card.className='room-card';
+    card.setAttribute('data-ready',String(Boolean(data.players[i]?.ready&&data.players[i]?.connected)));
+    const name=document.createElement('strong');
+    name.textContent='P'+(i+1)+' · '+roomNames[i]+(c.you===i?'（你）':'');
+    const state=document.createElement('span');
+    state.textContent=text;
+    card.append(name,state);cards.append(card);
+   });
+   cards.hidden=false;
+  }
+  return;
+ }
+ if(data.game){
+  const previous=players;
+  ({players,mobs,loot,shots,elapsed,round,wins,safe,active,transition}=data.game);
+  for(const [i,p] of players.entries()){
+   if(previous[i]&&previous[i].walk!==p.walk)p.lastMove=now;
+   else p.lastMove=previous[i]?.lastMove??-1;
+  }
+  showPlayerMarkers(active&&elapsed<1.2);
+  for(const event of data.events){
+   if(event.id<=c.after)continue;
+   c.after=event.id;fx.push(...event.fx);
+   for(const [cue,delay] of event.cues)sound(cue,delay);
+  }
+  hud();
+ }
+ if(data.phase==='finished'){
+  active=false;transition=null;showPlayerMarkers(false);
+  if(exitPrompt)closeExit();
+  panel('对战结束',data.result,[['返回主界面',()=>roomHome()]]);
+ }else if(active)el('panel').hidden=true;
+ else if(data.game)panel(data.game.title,data.game.message,[]);
+}
+async function restoreRoom(){
+ if(!onlineSupported)return;
+ const code=new URLSearchParams(location.search).get('room');
+ if(!code)return;
+ let previous=null;
+ try{previous=JSON.parse(sessionStorage.getItem('animal-duel-room'));}catch{}
+ if(previous?.code===code&&previous.token){
+  try{attachRoom({...await roomCall({action:'poll',code,token:previous.token}),token:previous.token});return;}
+  catch{sessionStorage.removeItem('animal-duel-room');}
+ }
+ panel('加入好友房','房间 '+code,[['加入房间',()=>enterRoom('join',code)],['返回主界面',()=>roomHome()]]);
+}
+
+menu();hud();restoreRoom();
+function frame(ms){now=ms/1000;const dt=Math.min(.033,last?(ms-last)/1000:0);last=ms;if(!exitPrompt&&!online){if(active)update(dt);else if(transition)advanceTransition(dt)}draw(exitPrompt?0:dt);requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+</script></html>
