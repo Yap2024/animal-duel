@@ -1,6 +1,6 @@
-<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>动物对决</title>
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>动物对决</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#090e17;color:#f3f6fb;font:16px system-ui,sans-serif}main{max-width:1120px;margin:auto;padding:20px}header,.hud,.foot,.controls{display:flex;align-items:center;justify-content:space-between;gap:12px}h1{margin:0;font-size:24px}header span,.foot{color:#aab7cc}.arena{margin-top:14px;position:relative;background:#111c2c;border:1px solid #34455e;border-radius:16px;overflow:hidden}.hud{position:absolute;top:0;left:0;right:0;padding:14px;background:linear-gradient(#080f1ded,transparent);pointer-events:none}.side{width:38%}.right{text-align:right}.bar{height:10px;border-radius:6px;background:#34445c;margin-top:5px;overflow:hidden}.bar i{display:block;height:100%;background:#4ee0d5}.right .bar i{margin-left:auto;background:#ff887e}.time{text-align:center;font:700 23px monospace;min-width:74px}.time small{display:block;font:12px system-ui;color:#afbdd1}canvas{display:block;width:100%;height:auto}.panel{position:absolute;inset:0;display:grid;place-content:center;text-align:center;background:#0b1322c9;padding:18px}.panel[hidden]{display:none}.panel h2{font-size:clamp(23px,6vw,52px);margin:0}.panel p{margin:7px 0 15px;color:#ced8e9}.actions{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}button{font:700 15px system-ui;border:1px solid #49617c;background:#24344c;color:white;border-radius:10px;padding:10px 15px;cursor:pointer;touch-action:none}button.primary{background:#76eee0;color:#10222b;border-color:transparent}button:active{transform:translateY(2px)}.foot{margin-top:12px;flex-wrap:wrap;font-size:14px}.controls{display:none;margin-top:12px}.controls div{display:flex;gap:9px}.controls button{min-width:56px;min-height:48px}@media(pointer:coarse){.controls{display:flex}}@media(max-width:600px){main{padding:8px}.hud{padding:7px;font-size:12px}.time{font-size:18px}.panel p{font-size:13px}.panel button{padding:6px 8px}}
+*{box-sizing:border-box}body{margin:0;background:#090e17;color:#f3f6fb;font:16px system-ui,sans-serif}main{max-width:1120px;margin:auto;padding:20px}header,.hud,.foot,.controls{display:flex;align-items:center;justify-content:space-between;gap:12px}h1{margin:0;font-size:24px}header span,.foot{color:#aab7cc}.arena{margin-top:14px;position:relative;background:#111c2c;border:1px solid #34455e;border-radius:16px;overflow:hidden}.hud{position:absolute;top:0;left:0;right:0;padding:14px;background:linear-gradient(#080f1ded,transparent);pointer-events:none}.side{width:38%}.right{text-align:right}.bar{height:10px;border-radius:6px;background:#34445c;margin-top:5px;overflow:hidden}.bar i{display:block;height:100%;background:#4ee0d5}.right .bar i{margin-left:auto;background:#ff887e}.time{text-align:center;font:700 23px monospace;min-width:74px}.time small{display:block;font:12px system-ui;color:#afbdd1}canvas{display:block;width:100%;height:auto}.panel{position:absolute;inset:0;display:grid;place-content:center;text-align:center;background:#0b1322c9;padding:18px}.panel[hidden]{display:none}.panel h2{font-size:clamp(23px,6vw,52px);margin:0}.panel p{margin:7px 0 15px;color:#ced8e9}.actions{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}button{font:700 15px system-ui;border:1px solid #49617c;background:#24344c;color:white;border-radius:10px;padding:10px 15px;cursor:pointer;touch-action:none}button.primary{background:#76eee0;color:#10222b;border-color:transparent}button:active{transform:translateY(2px)}.foot{margin-top:12px;flex-wrap:wrap;font-size:14px}.controls{display:none;margin-top:12px}.controls div{display:flex;gap:9px}.controls button{min-width:56px;min-height:48px}@media(max-width:600px){main{padding:8px}.hud{padding:7px;font-size:12px}.time{font-size:18px}.panel p{font-size:13px}.panel button{padding:6px 8px}}
 .header-actions{display:flex;gap:8px;align-items:center}.header-actions button[hidden],#exit-result[hidden]{display:none}#exit-panel{z-index:2}#exit-panel label{display:block;margin:0 0 12px}#exit-panel select{font:inherit;color:#fff;background:#24344c;border:1px solid #49617c;border-radius:8px;padding:5px 8px}#exit-result{color:#ffbd95;margin:0 0 12px}
 #version-button{position:absolute;right:12px;bottom:12px;padding:5px 9px;color:#c5d6ee;font:700 13px monospace}
 #version-button[hidden],.player-marker[hidden]{display:none}
@@ -15,11 +15,55 @@
 .room-card{display:grid;gap:5px;min-width:110px;padding:10px;background:#17263a;border:1px solid #435775;border-radius:9px;text-align:left}
 .room-card strong{color:#76eee0}.room-card:nth-child(2) strong{color:#ff9b8f}
 .room-card span{color:#c8d6e9;font-size:13px}
-.room-card[data-ready="true"] span{color:#a3f6b4}</style>
-<main><header><h1>动物对决</h1><span id="mode">在线好友房</span><div class="header-actions"><button id="return-home" type="button" hidden>返回主界面</button><button id="audio-toggle" type="button" aria-pressed="false">静音</button></div></header>
+.room-card[data-ready="true"] span{color:#a3f6b4}
+/* Rotate the whole play surface, including HUD and multitouch controls. */
+.controls button.is-pressed{background:#6dd6cc;color:#122438;border-color:#b3fff7;transform:translateY(2px)}
+ body.touch-layout.match-screen{overflow:hidden;overscroll-behavior:none}
+ .touch-layout.match-screen main{
+  --play-width:100dvw;--play-height:100dvh;
+  position:fixed;inset:0 auto auto 0;width:var(--play-width);height:var(--play-height);
+  max-width:none;margin:0;padding:5px 7px;display:flex;flex-direction:column;align-items:center;
+  background:#090e17;overflow:hidden;touch-action:none;user-select:none;
+ }
+ .touch-layout.match-screen header{width:100%;min-height:32px;flex-shrink:0;padding:0 max(6px,env(safe-area-inset-right)) 0 max(6px,env(safe-area-inset-left));gap:6px}
+ .touch-layout.match-screen h1{font-size:16px;white-space:nowrap}
+ .touch-layout.match-screen header span{font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .touch-layout.match-screen .header-actions{gap:5px}
+ .touch-layout.match-screen header button{font-size:12px;padding:5px 7px;white-space:nowrap}
+ .touch-layout.match-screen .arena{flex-shrink:0;width:min(100%,calc((var(--play-height) - 47px) * 16 / 9));margin-top:3px;aspect-ratio:16 / 9}
+ .touch-layout.match-screen canvas{width:100%;height:100%}
+ .touch-layout.match-screen .hud{padding:7px 9px;font-size:12px;gap:5px}
+ .touch-layout.match-screen .time{font-size:18px;min-width:64px}
+ .touch-layout.match-screen .foot{display:none}
+ .touch-layout.match-screen .controls{
+  position:absolute;z-index:2;bottom:max(8px,env(safe-area-inset-bottom));left:max(9px,env(safe-area-inset-left));right:max(9px,env(safe-area-inset-right));
+  display:flex;margin:0;pointer-events:none;touch-action:none
+ }
+ .touch-layout.match-screen .controls[hidden]{display:none}
+ .touch-layout.match-screen .controls div{gap:7px}
+ .touch-layout.match-screen .controls button{
+  pointer-events:auto;min-width:49px;min-height:45px;padding:5px 8px;
+  background:#1b3249e8;border-color:#6883a1;font-size:15px;touch-action:none
+ }
+ .touch-layout.match-screen .controls button.is-pressed{background:#89e9de;color:#0c2230}
+ .touch-layout.match-screen .attack-key{border-color:#e5a989!important}
+@media (orientation:portrait){
+ .touch-layout.match-screen main{
+  --play-width:100dvh;--play-height:100dvw;
+  inset:0 auto auto 100dvw;transform-origin:top left;transform:rotate(90deg);
+  padding-left:max(7px,env(safe-area-inset-top));padding-right:max(7px,env(safe-area-inset-bottom))
+ }
+ .touch-layout.match-screen .controls{left:max(9px,env(safe-area-inset-top));right:max(9px,env(safe-area-inset-bottom));bottom:9px}
+}
+ 
+.local-test{display:block;margin:10px auto 0;padding:5px 10px;border-color:#536077;background:#253044;color:#c6cbd4;font-size:12px}
+.local-test[hidden],#latency[hidden]{display:none}
+#latency{white-space:nowrap;font:700 12px monospace;color:#83e8c8}
+</style>
+<main><header><h1>动物对决</h1><span id="mode">在线好友房</span><div class="header-actions"><span id="latency" aria-label="网络往返延迟" hidden></span><button id="return-home" type="button" hidden>返回主界面</button><button id="audio-toggle" type="button" aria-pressed="false">静音</button></div></header>
 <section class="arena"><canvas id="field" width="960" height="540" aria-label="横版竞技场"></canvas>
 <div class="hud"><div class="side"><b id="blue">居居侠 · 空手</b><div class="bar"><i id="bbar"></i></div></div><div class="time"><span id="clock">3:00</span><small id="score">0 : 0</small></div><div class="side right"><b id="red">小狗大王 · 空手</b><div class="bar"><i id="rbar"></i></div></div></div>
-<div class="panel" id="panel"><h2 id="title">动物对决</h2><p id="message">打倒对手，或截住装备怪换个打法。</p><div id="exit-result" role="status" hidden></div><div id="room-cards" class="room-cards" hidden></div><div class="actions" id="actions"></div><button id="version-button" type="button" aria-label="查看更新日志" hidden></button></div>
+<div class="panel" id="panel"><h2 id="title">动物对决</h2><p id="message">打倒对手，或截住装备怪换个打法。</p><div id="exit-result" role="status" hidden></div><div id="room-cards" class="room-cards" hidden></div><div class="actions" id="actions"></div><button id="local-test" class="local-test" type="button" hidden>本地测试</button><button id="version-button" type="button" aria-label="查看更新日志" hidden></button></div>
 <span class="player-marker" id="p1-marker" hidden>P1</span><span class="player-marker" id="p2-marker" hidden>P2</span>
 <div class="panel" id="version-log" role="dialog" aria-modal="true" aria-labelledby="version-heading" hidden>
  <h2 id="version-heading">更新日志</h2><div id="version-entries"></div>
@@ -30,7 +74,10 @@
  <label>退出玩家 <select id="exit-player"><option value="0">居居侠</option><option value="1">小狗大王</option></select></label>
  <div class="actions"><button id="exit-cancel" class="primary" type="button">取消</button><button id="exit-confirm" type="button">确定退出</button></div>
 </div></section>
-<div class="controls"><div><button data-key="KeyA">左</button><button data-key="KeyD">右</button></div><div><button data-key="KeyW">跳</button><button data-key="KeyJ">攻击</button></div></div>
+<div class="controls" id="touch-controls" aria-label="触屏操作" hidden>
+ <div><button type="button" data-key="KeyA" aria-label="向左">◀</button><button type="button" data-key="KeyD" aria-label="向右">▶</button></div>
+ <div><button type="button" data-key="KeyW">跳跃</button><button type="button" class="attack-key" data-key="KeyJ">攻击</button></div>
+</div>
 <div class="foot"><span>A / D 移动 · W 跳 · J 攻击</span><span>也可用 ← / → 移动 · ↑ 跳 · L 攻击</span></div></main>
 <script>
 const el=id=>document.getElementById(id), canvas=el('field'), g=canvas.getContext('2d');
@@ -53,9 +100,11 @@ const monsterRoute=[
 ];
 const paint=['#4ee0d5','#ff887e'];
 let players=[], mobs=[], loot=[], shots=[], fx=[], elapsed=0,waveAt=0,waveCount=0,round=1,wins=[0,0],side=0,bot=false,active=false,last=0,now=0,safe=540,transition=null;
-let exitPrompt=false;
+let exitPrompt=false, localTest=false;
 const audioEvents=[];
 const releaseNotes=[
+ {version:'v1.3.5', notes:'WebSocket 实时同步、延迟读数和本地测试入口。'},
+ {version:'v1.2.5', notes:'手机对战新增左右分区虚拟按键和全屏横向布局。'},
  {version:'v1.1.5', notes:'首页只保留创建和加入在线好友房。'},
  {version:'v1.1.4', notes:'在线版首页新增加入好友房入口，可用房间码加入。'},
  {version:'v1.1.3', notes:'加入在线好友房、准备状态和自动联机对战，保留本机双人。'},
@@ -202,8 +251,10 @@ function menu(exitMessage=''){
  previousTip=tips.indexOf(tip);
  const buttons=[['创建好友房',()=>enterRoom('create')],['加入好友房',joinByCode]];
  panel('动物对决','tips：'+tip,buttons);
+ el('local-test').hidden=false;
 }
 function panel(title,message,buttons){
+ el('local-test').hidden=true;
  el('room-cards').hidden=true;
  el('title').textContent=title;el('message').textContent=message;el('actions').replaceChildren();
  buttons.forEach(([label,action],i)=>{const b=document.createElement('button');b.textContent=label;if(!i)b.className='primary';b.onclick=()=>{unlockAudio();sound('click');action()};el('actions').append(b)});el('panel').hidden=false;
@@ -211,14 +262,16 @@ function panel(title,message,buttons){
 function openExit(){
  if(el('return-home').hidden||exitPrompt)return;
  unlockAudio();sound('click');
- exitPrompt=true;keys.clear();
+ exitPrompt=true;keys.clear();clearTouch();sendInput();
  el('exit-player').value=String(online?.you??0);
  el('exit-player').disabled=Boolean(online);
  el('exit-panel').hidden=false;
+ el('touch-controls').hidden=true;
  el('exit-cancel').focus();
 }
 function closeExit(){
  exitPrompt=false;keys.clear();el('exit-panel').hidden=true;
+ el('touch-controls').hidden=!localTest&&online?.phase!=='playing';
 }
 el('return-home').onclick=openExit;
 el('exit-cancel').onclick=()=>{
@@ -228,6 +281,7 @@ el('exit-cancel').onclick=()=>{
 el('exit-confirm').onclick=()=>{
  if(!exitPrompt)return;
  if(online){closeExit();roomCommand('leave');return;}
+ if(localTest){closeExit();roomHome();return;}
  const loser=el('exit-player').value==='1'?1:0;
  const names=['居居侠','小狗大王'];
  unlockAudio();sound('click');sound('victory',.12);
@@ -248,7 +302,7 @@ function spawn(){
  const count=6;
  const equip=waveCount===0||Math.random()<.5?Math.floor(Math.random()*count):-1;
  for(let i=0;i<count;i++){const type=waveCount===0?0:(i===2?1:i===4?2:0);
- mobs.push({isMob:true,x:480,y:167,v:0,hp:waveCount===0?16:type===1?48:24,maxHp:waveCount===0?16:type===1?48:24,pause:0,opening:waveCount===0,speed:[90,65,115][type],type,equip:i===equip,mirror:Math.random()<.5,point:0,wait:i*.65});
+ mobs.push({id:waveCount*count+i,isMob:true,x:480,y:167,v:0,hp:waveCount===0?16:type===1?48:24,maxHp:waveCount===0?16:type===1?48:24,pause:0,opening:waveCount===0,speed:[90,65,115][type],type,equip:i===equip,mirror:Math.random()<.5,point:0,wait:i*.65});
  }waveCount++;waveAt=elapsed+12;if(waveCount>1)sound('wave');
 }
 function burst(x,y,tint,n=9){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,s=55+Math.random()*145;fx.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,t:.13+Math.random()*.29,tint})}}
@@ -299,7 +353,8 @@ function land(o,old){for(const [x,y,width] of platforms){if(old<=y&&o.y>=y&&o.x>
 function controls(p,dt){
  if(!p.i||!bot){
   const [l,r,j,a]=p.i?['ArrowLeft','ArrowRight','ArrowUp','KeyL']:['KeyA','KeyD','KeyW','KeyJ'];
-  return [+keys.has(r)-+keys.has(l),keys.has(j),keys.has(a)];
+  const down=code=>keys.has(code)||(!p.i&&localTest&&(touchTaps.has(code)||[...touchPointers.values()].includes(code)));
+  return [+down(r)-+down(l),down(j),down(a)];
  }
  const enemy=players[0];p.think-=dt;
  if(p.think<=0){p.think=.13;p.ai=loot.filter(o=>o.y<safe).sort((a,b)=>Math.abs(a.x-p.x)-Math.abs(b.x-p.x))[0]||(!p.w&&mobs.find(m=>m.equip&&m.wait<=0&&m.hp>0&&Math.abs(m.y-p.y)<105))||enemy}
@@ -412,7 +467,7 @@ function end(){
  const match=wins.some(n=>n===2)||round===3;
  sound(match?(wins[0]===wins[1]?'draw':'victory'):win<0?'draw':'roundWin',.17);
  const name=i=>i===0?'居居侠':'小狗大王';
- if(match){el('return-home').hidden=true;const winner=wins[0]===wins[1]?'整场平局':name(wins[0]>wins[1]?0:1)+'赢得比赛';panel(winner,'最终比分 '+wins.join(' : '),[['再来一场',()=>start(bot)],['返回菜单',menu]]);}
+ if(match){el('return-home').hidden=true;const winner=wins[0]===wins[1]?'整场平局':name(wins[0]>wins[1]?0:1)+'赢得比赛';panel(winner,'最终比分 '+wins.join(' : '),[['再来一场',()=>el('local-test').onclick()],['返回主界面',()=>roomHome()]]);}
  else{
   panel(win<0?'本回合平局':name(win)+'赢下回合','比分 '+wins.join(' : '),[]);
   transition={kind:'result',remaining:1.4};
@@ -674,12 +729,12 @@ function draw(dt){
  rect(405,475,150,65,'#0c1221');rect(405,531,150,9,'#8b4378');
  for(const [x,y,w] of platforms){rect(x,y,w,16,'#273653');rect(x,y,w,4,'#7d9aba');rect(x,y+5,w,2,'#4d6889');for(let j=12;j<w-10;j+=32)rect(x+j,y+10,15,2,'#384d6d');}
  g.strokeStyle='#b4a2ff';g.lineWidth=2;g.beginPath();g.ellipse(480,146,25,9,0,0,Math.PI*2);g.stroke();
- for(const m of mobs)if(m.wait<=0)drawMonster(m);
+ for(const m of mobs)if(m.wait<=0)drawMonster(displayPosition(m));
  for(const o of loot){const tint=lootColor(o),y=o.y+Math.sin(now*5)*3;circle(o.x,y,15,tint+'42');
   if(o.kind==='health'){rect(o.x-9,y-3,18,6,tint);rect(o.x-3,y-9,6,18,tint)}
   else if(o.kind==='armor'){g.fillStyle=tint;g.beginPath();g.moveTo(o.x-8,y-8);g.lineTo(o.x+8,y-8);g.lineTo(o.x+6,y+4);g.lineTo(o.x,y+10);g.lineTo(o.x-6,y+4);g.fill()}
   else drawWeapon(o.w,o.x,y)}
- for(const p of players)if(p.hp>0)drawAnimal(p);
+ for(const p of players)if(p.hp>0)drawAnimal(displayPosition(p));
  for(const s of shots){g.strokeStyle=s.w.tint;g.lineWidth=3;g.beginPath();g.moveTo(s.x-s.vx*.027,s.y-s.vy*.027);g.lineTo(s.x,s.y);g.stroke();}
  if(safe<540){rect(0,safe,960,540-safe,'#ed498651');rect(0,safe,960,3,'#ff688d');
   for(let x=0;x<960;x+=24){
@@ -690,14 +745,47 @@ function draw(dt){
  for(const f of fx){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vy+=150*dt;f.t-=dt;if(f.t>0){g.globalAlpha=Math.min(1,f.t*5);circle(f.x,f.y,2,f.tint)}}g.globalAlpha=1;fx=fx.filter(f=>f.t>0);
 }
 const allowed=['KeyA','KeyD','KeyW','KeyJ','ArrowLeft','ArrowRight','ArrowUp','KeyL'];
-addEventListener('keydown',e=>{if(exitPrompt){if(e.code==='Escape'){el('exit-cancel').click();e.preventDefault()}return}if(allowed.includes(e.code)){if(!e.repeat&&(!audio||audio.state!=='running'))unlockAudio();keys.add(e.code);e.preventDefault()}});
-addEventListener('keyup',e=>keys.delete(e.code));addEventListener('blur',()=>keys.clear());
-for(const b of document.querySelectorAll('[data-key]')){
- b.onpointerdown=e=>{if(exitPrompt)return;unlockAudio();b.setPointerCapture(e.pointerId);keys.add(b.dataset.key)};
- b.onpointerup=b.onpointercancel=b.onlostpointercapture=()=>keys.delete(b.dataset.key);
+addEventListener('keydown',e=>{if(exitPrompt){if(e.code==='Escape'){el('exit-cancel').click();e.preventDefault()}return}if(allowed.includes(e.code)){if(!e.repeat&&(!audio||audio.state!=='running'))unlockAudio();keys.add(e.code);sendInput();e.preventDefault()}});
+addEventListener('keyup',e=>{keys.delete(e.code);sendInput()});
+const touchButtons=[...document.querySelectorAll('[data-key]')];
+const touchPointers=new Map(), touchTaps=new Set();
+function clearTouch(){
+ touchPointers.clear();touchTaps.clear();
+ for(const button of touchButtons)button.classList.remove('is-pressed');
+}
+function setBattleLayout(show,controls=show){
+ document.body?.classList.toggle('match-screen',show);
+ el('touch-controls').hidden=!controls||exitPrompt;
+ if(!controls)clearTouch();
+}
+addEventListener('blur',()=>{keys.clear();clearTouch();sendInput()});
+document.addEventListener?.('visibilitychange',()=>{if(document.hidden){keys.clear();clearTouch();sendInput()}});
+for(const button of touchButtons){
+ const code=button.dataset.key;
+ button.onpointerdown=event=>{
+  if(exitPrompt||(!localTest&&online?.phase!=='playing'))return;
+  event.preventDefault();unlockAudio();
+  button.setPointerCapture(event.pointerId);
+  touchPointers.set(event.pointerId,code);
+  touchTaps.add(code);
+  button.classList.add('is-pressed');sendInput();
+ };
+ button.onpointerup=button.onpointercancel=button.onlostpointercapture=event=>{
+  touchPointers.delete(event.pointerId);
+  if(![...touchPointers.values()].includes(code))button.classList.remove('is-pressed');
+  sendInput();
+ };
 }
 const onlineSupported=typeof location!=='undefined'&&/^https?:$/.test(location.protocol);
 let online=null, roomBusy=false;
+const simulatedPhone=typeof location!=='undefined'&&new URLSearchParams(location.search).get('phone')==='1';
+document.body?.classList.toggle('touch-layout',simulatedPhone||Boolean(globalThis.matchMedia?.('(any-pointer: coarse)').matches));
+el('local-test').onclick=()=>{
+ unlockAudio();sound('click');
+ localTest=true;start(false);
+ el('mode').textContent='本地测试';
+ setBattleLayout(true);
+};
 const roomNames=['居居侠','小狗大王'];
 async function roomCall(payload){
  const response=await fetch('/api/room',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
@@ -709,12 +797,16 @@ function roomMessage(text){
  panel('在线好友房',text,[['返回主界面',()=>roomHome()]]);
 }
 function roomHome(message=''){
- online=null;roomBusy=false;
+ const socket=online?.socket;
+ online=null;roomBusy=false;localTest=false;motion.clear();
+ socket?.close();
+ el('latency').hidden=true;
+ setBattleLayout(false);
  keys.clear();active=false;transition=null;players=[];mobs=[];loot=[];shots=[];fx=[];
  elapsed=0;safe=540;round=1;wins=[0,0];
  if(onlineSupported){
   sessionStorage.removeItem('animal-duel-room');
-  history.replaceState(null,'',location.pathname);
+  history.replaceState(null,'',location.pathname+(simulatedPhone?'?phone=1':''));
  }
  hud();menu(message);
 }
@@ -754,31 +846,68 @@ function attachRoom(data){
  const connection={code:data.code,token:data.token,you:data.you,after:0,view:'',busy:false};
  online=connection;
  sessionStorage.setItem('animal-duel-room',JSON.stringify(connection));
- history.replaceState(null,'','?room='+data.code);
+ history.replaceState(null,'','?room='+data.code+(simulatedPhone?'&phone=1':''));
  renderRoom(data);
- pollRoom(connection);
+ connectRoom(connection);
 }
 function playerInput(){
- const held=(...codes)=>codes.some(code=>keys.has(code));
+ const touches=new Set([...touchPointers.values(),...touchTaps]);
+ touchTaps.clear();
+ const held=(...codes)=>codes.some(code=>keys.has(code)||touches.has(code));
  return [held('KeyA','ArrowLeft'),held('KeyD','ArrowRight'),held('KeyW','ArrowUp'),held('KeyJ','KeyL')];
 }
-async function pollRoom(connection){
- if(online!==connection)return;
- try{
-  const data=await roomCall({action:'poll',code:connection.code,token:connection.token,after:connection.after,input:playerInput()});
-  if(online!==connection)return;
-  connection.failedSince=0;
-  el('mode').textContent='好友房 '+connection.code;
-  renderRoom(data);
-  if(data.phase==='finished')return;
- }catch(error){
-  if(online!==connection)return;
-  if(error.status===403||error.status===404){roomHome(error.message);return;}
-  connection.failedSince ||= Date.now();
-  el('mode').textContent='连接中断 · 正在重连';
-  if(Date.now()-connection.failedSince>16000){roomHome('连接超时，已退出好友房。');return;}
- }
- setTimeout(()=>pollRoom(connection),connection.phase==='playing'?38:300);
+function sendInput(){
+ const c=online;
+ if(c?.phase!=='playing'||c.socket?.readyState!==1||!c.received)return;
+ const input=exitPrompt?[false,false,false,false]:playerInput();
+ const mask=input.reduce((result,value,i)=>result|(Number(value)<<i),0);
+ if(mask===c.inputMask)return;
+ c.inputMask=mask;
+ c.socket.send(JSON.stringify({type:'input',input}));
+}
+function connectRoom(c){
+ if(online!==c||c.phase==='finished')return;
+ const url=new URL('/api/live',location.href);
+ url.protocol=location.protocol==='https:'?'wss:':'ws:';
+ const socket=new WebSocket(url);
+ c.socket=socket;c.received=false;c.inputMask=-1;
+ const expires=setTimeout(()=>socket.close(),5000);
+ let heartbeat,lastReply=Date.now();
+ const ping=()=>{
+  if(socket.readyState!==1)return;
+  if(Date.now()-lastReply>5000){socket.close();return;}
+  socket.send(JSON.stringify({type:'ping',sent:performance.now()}));
+ };
+ socket.onopen=()=>{
+  socket.send(JSON.stringify({type:'hello',code:c.code,token:c.token,after:c.after}));
+  ping();heartbeat=setInterval(ping,1000);
+ };
+ socket.onmessage=event=>{
+  if(online!==c||socket!==c.socket)return;
+  const message=JSON.parse(event.data);
+  lastReply=Date.now();
+  if(message.type==='pong'){
+   const rtt=Math.round(performance.now()-message.sent);
+   el('latency').textContent=rtt+' ms';el('latency').hidden=false;
+   return;
+  }
+  if(message.type==='state'){
+   clearTimeout(expires);c.received=true;c.failedSince=0;c.retry=0;
+   renderRoom(message.data);sendInput();
+   if(c.phase==='finished')socket.close();
+  }
+ };
+ socket.onclose=event=>{
+  clearInterval(heartbeat);clearTimeout(expires);
+  if(online!==c||socket!==c.socket||c.phase==='finished')return;
+  if(event.code===1008){roomHome('房间会话已失效，请重新加入。');return;}
+  c.failedSince ||= Date.now();
+  el('latency').hidden=false;el('latency').textContent='重连中';
+  if(Date.now()-c.failedSince>16000){roomHome('连接超时，已退出好友房。');return;}
+  const delay=Math.min(2500,300*2**(c.retry||0));
+  c.retry=(c.retry||0)+1;
+  setTimeout(()=>connectRoom(c),delay);
+ };
 }
 async function roomCommand(action,fields={}){
  const c=online;
@@ -794,10 +923,33 @@ async function roomCommand(action,fields={}){
   else el('message').textContent=error.message||'连接失败，请重试。';
  }finally{c.busy=false;}
 }
+const motion=new Map();
+function entityKey(entity){return entity.isMob?'m'+entity.id:'p'+entity.i}
+function displayPosition(entity){
+ if(!online)return entity;
+ const step=motion.get(entityKey(entity));
+ if(!step)return entity;
+ const blend=Math.max(0,Math.min(1,(now-step.start)/.043));
+ return {...entity,x:step.x+(entity.x-step.x)*blend,y:step.y+(entity.y-step.y)*blend};
+}
+function updateMotion(previous,previousRound){
+ const lastPosition=new Map(previous.map(entity=>{
+  const visual=displayPosition(entity);
+  return [entityKey(entity),visual];
+ }));
+ motion.clear();
+ if(previousRound!==round)return;
+ for(const entity of [...players,...mobs]){
+  const key=entityKey(entity), old=lastPosition.get(key);
+  if(old&&Math.hypot(entity.x-old.x,entity.y-old.y)<100)motion.set(key,{x:old.x,y:old.y,start:now});
+ }
+}
 function renderRoom(data){
  const c=online;
  if(!c||c.phase==='finished'||(c.phase==='playing'&&data.phase==='lobby'))return;
+ const wasPlaying=c.phase==='playing';
  c.phase=data.phase;
+ setBattleLayout(data.phase==='playing'||(data.phase==='finished'&&wasPlaying),data.phase==='playing');
  el('version-button').hidden=true;
  el('exit-result').hidden=true;
  el('mode').textContent='好友房 '+data.code;
@@ -831,8 +983,9 @@ function renderRoom(data){
   return;
  }
  if(data.game){
-  const previous=players;
+  const previous=players, previousMobs=mobs, previousRound=round;
   ({players,mobs,loot,shots,elapsed,round,wins,safe,active,transition}=data.game);
+  updateMotion([...previous,...previousMobs],previousRound);
   for(const [i,p] of players.entries()){
    if(previous[i]&&previous[i].walk!==p.walk)p.lastMove=now;
    else p.lastMove=previous[i]?.lastMove??-1;
@@ -866,6 +1019,6 @@ async function restoreRoom(){
 }
 
 menu();hud();restoreRoom();
-function frame(ms){now=ms/1000;const dt=Math.min(.033,last?(ms-last)/1000:0);last=ms;if(!exitPrompt&&!online){if(active)update(dt);else if(transition)advanceTransition(dt)}draw(exitPrompt?0:dt);requestAnimationFrame(frame)}
+function frame(ms){now=ms/1000;const dt=Math.min(.033,last?(ms-last)/1000:0);last=ms;if(!exitPrompt&&!online){if(active){update(dt);if(localTest)touchTaps.clear()}else if(transition)advanceTransition(dt)}draw(exitPrompt?0:dt);requestAnimationFrame(frame)}
 requestAnimationFrame(frame);
 </script></html>
