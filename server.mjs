@@ -1,5 +1,5 @@
 import {createServer} from 'node:http';
-import {randomBytes, randomInt} from 'node:crypto';
+import {createHash, randomBytes, randomInt} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {createContext, Script} from 'node:vm';
 import {pathToFileURL} from 'node:url';
@@ -7,6 +7,7 @@ import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url);
 
 const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
+const pageTag=JSON.stringify(createHash('sha256').update(html).digest('base64url'));
 const engine = new Script(html.split('<script>')[1].split('</script>')[0] + `
 globalThis.matchEngine = {
  start(){start(false)},
@@ -153,7 +154,9 @@ export async function handleRequest(req,res){
   try{
     const url=new URL(req.url,'http://localhost');
     if(req.method==='GET'&&url.pathname==='/'){
-      res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'});
+      const headers={'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache',ETag:pageTag};
+      if(req.headers?.['if-none-match']===pageTag){res.writeHead(304,headers);res.end();return;}
+      res.writeHead(200,headers);
       res.end(html);return;
     }
     if(req.method!=='POST'||url.pathname!=='/api/room')return send(res,404,{error:'找不到页面'});

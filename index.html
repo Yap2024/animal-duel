@@ -30,20 +30,24 @@
  .touch-layout.match-screen header span{font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
  .touch-layout.match-screen .header-actions{gap:5px}
  .touch-layout.match-screen header button{font-size:12px;padding:5px 7px;white-space:nowrap}
- .touch-layout.match-screen .arena{flex-shrink:0;width:min(100%,calc((var(--play-height) - 47px) * 16 / 9));margin-top:3px;aspect-ratio:16 / 9}
+ .touch-layout.match-screen .arena{flex:1 1 0;min-height:0;width:100%;margin-top:3px;border-radius:8px}
  .touch-layout.match-screen canvas{width:100%;height:100%}
  .touch-layout.match-screen .hud{padding:7px 9px;font-size:12px;gap:5px}
  .touch-layout.match-screen .time{font-size:18px;min-width:64px}
  .touch-layout.match-screen .foot{display:none}
  .touch-layout.match-screen .controls{
-  position:absolute;z-index:2;bottom:max(8px,env(safe-area-inset-bottom));left:max(9px,env(safe-area-inset-left));right:max(9px,env(safe-area-inset-right));
+  --side-gap:clamp(24px,5%,56px);--bottom-gap:clamp(18px,6%,30px);
+  position:absolute;z-index:2;
+  bottom:calc(env(safe-area-inset-bottom) + var(--bottom-gap));
+  left:calc(env(safe-area-inset-left) + var(--side-gap));
+  right:calc(env(safe-area-inset-right) + var(--side-gap));
   display:flex;margin:0;pointer-events:none;touch-action:none
  }
  .touch-layout.match-screen .controls[hidden]{display:none}
  .touch-layout.match-screen .controls div{gap:7px}
  .touch-layout.match-screen .controls button{
   pointer-events:auto;min-width:49px;min-height:45px;padding:5px 8px;
-  background:#1b3249e8;border-color:#6883a1;font-size:15px;touch-action:none
+  background:#1b324988;border-color:#9cb7d391;font-size:15px;touch-action:none
  }
  .touch-layout.match-screen .controls button.is-pressed{background:#89e9de;color:#0c2230}
  .touch-layout.match-screen .attack-key{border-color:#e5a989!important}
@@ -53,7 +57,11 @@
   inset:0 auto auto 100dvw;transform-origin:top left;transform:rotate(90deg);
   padding-left:max(7px,env(safe-area-inset-top));padding-right:max(7px,env(safe-area-inset-bottom))
  }
- .touch-layout.match-screen .controls{left:max(9px,env(safe-area-inset-top));right:max(9px,env(safe-area-inset-bottom));bottom:9px}
+ .touch-layout.match-screen .controls{
+  left:calc(env(safe-area-inset-top) + var(--side-gap));
+  right:calc(env(safe-area-inset-bottom) + var(--side-gap));
+  bottom:calc(env(safe-area-inset-left) + var(--bottom-gap))
+ }
 }
  
 .local-test{display:block;margin:10px auto 0;padding:5px 10px;border-color:#536077;background:#253044;color:#c6cbd4;font-size:12px}
@@ -80,7 +88,8 @@
 </div>
 <div class="foot"><span>A / D 移动 · W 跳 · J 攻击</span><span>也可用 ← / → 移动 · ↑ 跳 · L 攻击</span></div></main>
 <script>
-const el=id=>document.getElementById(id), canvas=el('field'), g=canvas.getContext('2d');
+const el=id=>document.getElementById(id), canvas=el('field');
+let g=canvas.getContext('2d');
 const keys=new Set(), weapons=[
  {name:'空手',damage:8,cd:.35,range:29,tint:'#ffffff',wind:.07,push:92},
  {name:'平射轻弩',damage:12,mobDamage:24,cd:.65,reaches:216,speed:432,tint:'#86f0ff',wind:.1,push:105},
@@ -103,6 +112,8 @@ let players=[], mobs=[], loot=[], shots=[], fx=[], elapsed=0,waveAt=0,waveCount=
 let exitPrompt=false, localTest=false;
 const audioEvents=[];
 const releaseNotes=[
+ {version:'v1.4.6', notes:'手机虚拟按键向内、向上留出空间，减少误触屏幕边缘。'},
+ {version:'v1.4.5', notes:'手机地图铺满对战区，半透明按键叠在画面上。缓存静态场景并优化联机反馈。'},
  {version:'v1.3.5', notes:'WebSocket 实时同步、延迟读数和本地测试入口。'},
  {version:'v1.2.5', notes:'手机对战新增左右分区虚拟按键和全屏横向布局。'},
  {version:'v1.1.5', notes:'首页只保留创建和加入在线好友房。'},
@@ -305,7 +316,7 @@ function spawn(){
  mobs.push({id:waveCount*count+i,isMob:true,x:480,y:167,v:0,hp:waveCount===0?16:type===1?48:24,maxHp:waveCount===0?16:type===1?48:24,pause:0,opening:waveCount===0,speed:[90,65,115][type],type,equip:i===equip,mirror:Math.random()<.5,point:0,wait:i*.65});
  }waveCount++;waveAt=elapsed+12;if(waveCount>1)sound('wave');
 }
-function burst(x,y,tint,n=9){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,s=55+Math.random()*145;fx.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,t:.13+Math.random()*.29,tint})}}
+function burst(x,y,tint,n=9){if(globalThis.authoritative){fx.push([x,y,tint,n]);return;}for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,s=55+Math.random()*145;fx.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,t:.13+Math.random()*.29,tint})}}
 function damage(t,n,x,push=0,attacker=null){
  if(t.hp<=0||t.inv>0)return;
  const armored=!t.isMob&&t.armor;
@@ -721,7 +732,8 @@ function drawMonster(m){
  });
  g.restore();
 }
-function draw(dt){
+let backdrop=null;
+function paintBackdrop(){
  const sky=g.createLinearGradient(0,0,0,540);sky.addColorStop(0,'#263958');sky.addColorStop(1,'#111728');rect(0,0,960,540,sky);
  for(let i=0;i<34;i++){circle((i*157+24)%960,(i*71+13)%380,i%5===0?2:1,'#92abc16b')}
  g.fillStyle='#1a2940';g.beginPath();g.moveTo(0,425);for(let i=0;i<=12;i++)g.lineTo(i*80,250+(i*73)%115);g.lineTo(960,540);g.lineTo(0,540);g.fill();
@@ -729,12 +741,25 @@ function draw(dt){
  rect(405,475,150,65,'#0c1221');rect(405,531,150,9,'#8b4378');
  for(const [x,y,w] of platforms){rect(x,y,w,16,'#273653');rect(x,y,w,4,'#7d9aba');rect(x,y+5,w,2,'#4d6889');for(let j=12;j<w-10;j+=32)rect(x+j,y+10,15,2,'#384d6d');}
  g.strokeStyle='#b4a2ff';g.lineWidth=2;g.beginPath();g.ellipse(480,146,25,9,0,0,Math.PI*2);g.stroke();
+}
+function draw(dt){
+ if(!backdrop&&typeof g.drawImage==='function'){
+  const layer=document.createElement('canvas');
+  layer.width=canvas.width;layer.height=canvas.height;
+  const cached=layer.getContext('2d');
+  if(cached){
+   const screen=g;g=cached;
+   try{paintBackdrop();backdrop=layer;}finally{g=screen;}
+  }
+ }
+ if(backdrop)g.drawImage(backdrop,0,0);
+ else paintBackdrop();
  for(const m of mobs)if(m.wait<=0)drawMonster(displayPosition(m));
  for(const o of loot){const tint=lootColor(o),y=o.y+Math.sin(now*5)*3;circle(o.x,y,15,tint+'42');
   if(o.kind==='health'){rect(o.x-9,y-3,18,6,tint);rect(o.x-3,y-9,6,18,tint)}
   else if(o.kind==='armor'){g.fillStyle=tint;g.beginPath();g.moveTo(o.x-8,y-8);g.lineTo(o.x+8,y-8);g.lineTo(o.x+6,y+4);g.lineTo(o.x,y+10);g.lineTo(o.x-6,y+4);g.fill()}
   else drawWeapon(o.w,o.x,y)}
- for(const p of players)if(p.hp>0)drawAnimal(displayPosition(p));
+ for(const p of players)if(p.hp>0)drawAnimal(p.i===online?.you&&localVisual?{...p,...localVisual}:displayPosition(p));
  for(const s of shots){g.strokeStyle=s.w.tint;g.lineWidth=3;g.beginPath();g.moveTo(s.x-s.vx*.027,s.y-s.vy*.027);g.lineTo(s.x,s.y);g.stroke();}
  if(safe<540){rect(0,safe,960,540-safe,'#ed498651');rect(0,safe,960,3,'#ff688d');
   for(let x=0;x<960;x+=24){
@@ -798,7 +823,7 @@ function roomMessage(text){
 }
 function roomHome(message=''){
  const socket=online?.socket;
- online=null;roomBusy=false;localTest=false;motion.clear();
+ online=null;roomBusy=false;localTest=false;motion.clear();localVisual=null;
  socket?.close();
  el('latency').hidden=true;
  setBattleLayout(false);
@@ -850,16 +875,36 @@ function attachRoom(data){
  renderRoom(data);
  connectRoom(connection);
 }
-function playerInput(){
+function playerInput(consume=true){
  const touches=new Set([...touchPointers.values(),...touchTaps]);
- touchTaps.clear();
+ if(consume)touchTaps.clear();
  const held=(...codes)=>codes.some(code=>keys.has(code)||touches.has(code));
  return [held('KeyA','ArrowLeft'),held('KeyD','ArrowRight'),held('KeyW','ArrowUp'),held('KeyJ','KeyL')];
+}
+let localVisual=null,jumpPreview=false;
+function predictLocal(dt){
+ const p=players[online?.you];
+ if(!active||!p?.hp||!online.received||exitPrompt||p.stun>0){localVisual=null;jumpPreview=false;return;}
+ if(!localVisual)localVisual={x:p.x,y:p.y,v:p.v,ground:p.ground,face:p.face,walk:p.walk,lastMove:p.lastMove};
+ const v=localVisual;
+ const [left,right,jump]=playerInput(false);
+ const dir=Number(right)-Number(left);
+ if(dir){v.face=dir;v.x+=dir*216*dt;v.walk+=dt;v.lastMove=now;}
+ if((jump||jumpPreview)&&v.ground){v.v=-435;v.ground=false;}
+ jumpPreview=false;
+ v.x=Math.max(15,p.x-48,Math.min(945,p.x+48,v.x));
+ const prev=v.y;v.v+=980*dt;v.y+=v.v*dt;
+ v.ground=v.v>=0&&land(v,prev);
+ const follow=1-Math.exp(-dt*16);
+ if(!dir)v.x+=(p.x-v.x)*follow;
+ if(!jump&&v.ground&&p.ground&&Math.abs(p.y-v.y)>8)v.y+=(p.y-v.y)*follow;
+ if(Math.abs(v.y-p.y)>110||v.y>530)localVisual=null;
 }
 function sendInput(){
  const c=online;
  if(c?.phase!=='playing'||c.socket?.readyState!==1||!c.received)return;
  const input=exitPrompt?[false,false,false,false]:playerInput();
+ if(input[2])jumpPreview=true;
  const mask=input.reduce((result,value,i)=>result|(Number(value)<<i),0);
  if(mask===c.inputMask)return;
  c.inputMask=mask;
@@ -986,6 +1031,8 @@ function renderRoom(data){
   const previous=players, previousMobs=mobs, previousRound=round;
   ({players,mobs,loot,shots,elapsed,round,wins,safe,active,transition}=data.game);
   updateMotion([...previous,...previousMobs],previousRound);
+  const current=players[c.you], old=previous[c.you];
+  if(previousRound!==round||!current||current.stun>0||(old&&Math.hypot(current.x-old.x,current.y-old.y)>100))localVisual=null;
   for(const [i,p] of players.entries()){
    if(previous[i]&&previous[i].walk!==p.walk)p.lastMove=now;
    else p.lastMove=previous[i]?.lastMove??-1;
@@ -993,7 +1040,7 @@ function renderRoom(data){
   showPlayerMarkers(active&&elapsed<1.2);
   for(const event of data.events){
    if(event.id<=c.after)continue;
-   c.after=event.id;fx.push(...event.fx);
+   c.after=event.id;for(const effect of event.fx)burst(...effect);
    for(const [cue,delay] of event.cues)sound(cue,delay);
   }
   hud();
@@ -1019,6 +1066,6 @@ async function restoreRoom(){
 }
 
 menu();hud();restoreRoom();
-function frame(ms){now=ms/1000;const dt=Math.min(.033,last?(ms-last)/1000:0);last=ms;if(!exitPrompt&&!online){if(active){update(dt);if(localTest)touchTaps.clear()}else if(transition)advanceTransition(dt)}draw(exitPrompt?0:dt);requestAnimationFrame(frame)}
+function frame(ms){now=ms/1000;const dt=Math.min(.033,last?(ms-last)/1000:0);last=ms;if(!exitPrompt&&!online){if(active){update(dt);if(localTest)touchTaps.clear()}else if(transition)advanceTransition(dt)}if(online)predictLocal(dt);draw(exitPrompt?0:dt);requestAnimationFrame(frame)}
 requestAnimationFrame(frame);
 </script></html>
