@@ -67,11 +67,23 @@
 .local-test{display:block;margin:10px auto 0;padding:5px 10px;border-color:#536077;background:#253044;color:#c6cbd4;font-size:12px}
 .local-test[hidden],#latency[hidden]{display:none}
 #latency{white-space:nowrap;font:700 12px monospace;color:#83e8c8}
+
+.room-lobby[hidden]{display:none}
+.arena.lobby-open{min-height:470px}
+.lobby-open canvas{position:absolute;inset:0;width:100%;height:100%}
+.lobby-open #panel{justify-items:center;grid-template-columns:minmax(0,410px);align-content:center}
+.room-lobby{width:100%;margin-top:12px;padding:9px 10px;border:1px solid #3f5067;border-radius:10px;background:#101c2ce6;text-align:left}
+.room-lobby h3{font-size:14px;margin:0 0 6px}
+#lobby-status{color:#b7c5d9;font-size:13px}
+#lobby-list{display:grid;gap:5px;max-height:115px;overflow-y:auto}
+.room-lobby .lobby-row{display:flex;justify-content:space-between;align-items:center;width:100%;gap:8px;padding:5px 8px;font-size:13px;touch-action:pan-y}
+.lobby-row span{font-size:12px;color:#c4d4e8}
+@media(max-width:600px){.arena.lobby-open{min-height:400px}}
 </style>
 <main><header><h1>动物对决</h1><span id="mode">在线好友房</span><div class="header-actions"><span id="latency" aria-label="网络往返延迟" hidden></span><button id="return-home" type="button" hidden>返回主界面</button><button id="audio-toggle" type="button" aria-pressed="false">静音</button></div></header>
-<section class="arena"><canvas id="field" width="960" height="540" aria-label="横版竞技场"></canvas>
+<section class="arena" id="game-arena"><canvas id="field" width="960" height="540" aria-label="横版竞技场"></canvas>
 <div class="hud"><div class="side"><b id="blue">居居侠 · 空手</b><div class="bar"><i id="bbar"></i></div></div><div class="time"><span id="clock">3:00</span><small id="score">0 : 0</small></div><div class="side right"><b id="red">小狗大王 · 空手</b><div class="bar"><i id="rbar"></i></div></div></div>
-<div class="panel" id="panel"><h2 id="title">动物对决</h2><p id="message">打倒对手，或截住装备怪换个打法。</p><div id="exit-result" role="status" hidden></div><div id="room-cards" class="room-cards" hidden></div><div class="actions" id="actions"></div><button id="local-test" class="local-test" type="button" hidden>本地测试</button><button id="version-button" type="button" aria-label="查看更新日志" hidden></button></div>
+<div class="panel" id="panel"><h2 id="title">动物对决</h2><p id="message">打倒对手，或截住装备怪换个打法。</p><div id="exit-result" role="status" hidden></div><div id="room-cards" class="room-cards" hidden></div><div class="actions" id="actions"></div><section class="room-lobby" id="room-lobby" aria-label="房间大厅" hidden><h3>房间大厅</h3><div id="lobby-status" role="status"></div><div id="lobby-list"></div></section><button id="local-test" class="local-test" type="button" hidden>本地测试</button><button id="version-button" type="button" aria-label="查看更新日志" hidden></button></div>
 <span class="player-marker" id="p1-marker" hidden>P1</span><span class="player-marker" id="p2-marker" hidden>P2</span>
 <div class="panel" id="version-log" role="dialog" aria-modal="true" aria-labelledby="version-heading" hidden>
  <h2 id="version-heading">更新日志</h2><div id="version-entries"></div>
@@ -112,6 +124,7 @@ let players=[], mobs=[], loot=[], shots=[], fx=[], elapsed=0,waveAt=0,waveCount=
 let exitPrompt=false, localTest=false;
 const audioEvents=[];
 const releaseNotes=[
+ {version:'v1.5.6', notes:'好友房使用 6 位数字房间号。大厅显示待加入的房间，房主可设置密码。'},
  {version:'v1.4.6', notes:'手机虚拟按键向内、向上留出空间，减少误触屏幕边缘。'},
  {version:'v1.4.5', notes:'手机地图铺满对战区，半透明按键叠在画面上。缓存静态场景并优化联机反馈。'},
  {version:'v1.3.5', notes:'WebSocket 实时同步、延迟读数和本地测试入口。'},
@@ -260,11 +273,13 @@ function menu(exitMessage=''){
  const available=tips.filter((_,i)=>i!==previousTip);
  const tip=available[Math.floor(Math.random()*available.length)];
  previousTip=tips.indexOf(tip);
- const buttons=[['创建好友房',()=>enterRoom('create')],['加入好友房',joinByCode]];
+ const buttons=[['创建好友房',createRoomForm],['加入好友房',joinByCode]];
  panel('动物对决','tips：'+tip,buttons);
  el('local-test').hidden=false;
+ showLobbyList();
 }
 function panel(title,message,buttons){
+ closeLobbyList();
  el('local-test').hidden=true;
  el('room-cards').hidden=true;
  el('title').textContent=title;el('message').textContent=message;el('actions').replaceChildren();
@@ -835,36 +850,106 @@ function roomHome(message=''){
  }
  hud();menu(message);
 }
-function joinByCode(){
- if(!onlineSupported){roomMessage('当前是本地文件预览。请通过联机服务器网址打开，再输入房间码加入。');return;}
- const input=document.createElement('input');
- input.id='room-code';
- input.placeholder='6 位房间码';
- input.maxLength=6;
- input.autocomplete='off';
- input.spellcheck=false;
- input.setAttribute('aria-label','房间码');
- const join=()=>{
-  const code=input.value.trim().toUpperCase();
-  if(!/^[A-HJ-NP-Z2-9]{6}$/.test(code)){
-   el('message').textContent='请输入有效的 6 位房间码。';input.focus();return;
+let lobbyTimer=0,lobbyGeneration=0;
+function closeLobbyList(){
+ if(lobbyTimer)clearTimeout(lobbyTimer);
+ lobbyTimer=0;lobbyGeneration++;
+ el('room-lobby').hidden=true;
+ el('game-arena').classList?.remove('lobby-open');
+}
+function showLobbyList(){
+ const list=el('room-lobby');
+ list.hidden=false;
+ el('game-arena').classList?.add('lobby-open');
+ const generation=lobbyGeneration;
+ el('lobby-list').replaceChildren();
+ el('lobby-status').textContent=onlineSupported?'正在加载房间…':'本地预览。部署后会在这里显示房间。';
+ if(!onlineSupported)return;
+ async function refresh(){
+  try{
+   const response=await fetch('/api/rooms',{cache:'no-store'});
+   if(!response.ok)throw new Error('无法加载房间');
+   const {rooms}=await response.json();
+   if(generation!==lobbyGeneration)return;
+   el('lobby-status').textContent=rooms.length?'':'暂无等待加入的房间';
+   const rows=el('lobby-list');
+   const signature=rooms.map(room=>room.code+Number(room.locked)).join(',');
+   if(rows.dataset.signature!==signature||(!rows.children.length&&rooms.length)){
+    rows.dataset.signature=signature;
+    rows.replaceChildren();
+    for(const room of rooms){
+     const row=document.createElement('button');
+     row.type='button';row.className='lobby-row';
+     const code=document.createElement('strong');code.textContent='房间 '+room.code;
+     const lock=document.createElement('span');lock.textContent=room.locked?'🔒 需密码':'直接加入';
+     row.append(code,lock);
+     row.onclick=()=>{unlockAudio();sound('click');openListedRoom(room);};
+     rows.append(row);
+    }
+   }
+  }catch{
+   if(generation!==lobbyGeneration)return;
+   el('lobby-status').textContent='暂时无法加载房间，正在重试。';
   }
-  enterRoom('join',code);
- };
- panel('加入好友房','输入朋友分享的房间码。',[['加入',join],['返回主界面',()=>roomHome()]]);
+  if(generation===lobbyGeneration)lobbyTimer=setTimeout(refresh,2000);
+ }
+ refresh();
+}
+function roomForm(title,message,kind,submit){
+ const input=document.createElement('input');
+ input.id='room-code';input.type=kind==='code'?'text':'password';
+ input.placeholder=kind==='code'?'6 位房间号':kind==='optional'?'房间密码（选填）':'房间密码';
+ input.maxLength=kind==='code'?6:32;
+ if(kind==='code')input.inputMode='numeric';
+ input.autocomplete='off';input.spellcheck=false;
+ input.setAttribute('aria-label',input.placeholder);
+ const send=()=>submit(input.value.trim());
+ panel(title,message,[[kind==='optional'?'创建':'加入',send],['返回大厅',()=>roomHome()]]);
  el('actions').prepend(input);
- input.addEventListener('keydown',event=>{event.stopPropagation();if(event.key==='Enter')join();});
+ input.addEventListener('keydown',event=>{event.stopPropagation();if(event.key==='Enter')send();});
  input.focus();
 }
-async function enterRoom(action,code){
+function createRoomForm(){
+ if(!onlineSupported){roomMessage('当前是本地预览。请从游戏网址打开好友房。');return;}
+ roomForm('创建好友房','房间会出现在大厅。设置密码后，朋友加入时需要输入。','optional',password=>enterRoom('create',undefined,password));
+}
+function openListedRoom(room,error=''){
+ if(room.locked)roomForm('加入房间 '+room.code,error||'这个房间需要密码。','password',password=>{
+  if(!password){el('message').textContent='请输入房间密码。';return;}
+  enterRoom('join',room.code,password);
+ });
+ else enterRoom('join',room.code);
+}
+async function inspectRoom(code){
+ if(!/^\d{6}$/.test(code)){el('message').textContent='请输入 6 位数字房间号。';return;}
+ if(roomBusy)return;
+ roomBusy=true;
+ const generation=lobbyGeneration;
+ try{
+  const room=await roomCall({action:'inspect',code});
+  if(generation===lobbyGeneration){roomBusy=false;openListedRoom(room);}
+ }catch(error){
+  if(generation===lobbyGeneration)el('message').textContent=error.message||'暂时无法查找房间。';
+ }finally{if(generation===lobbyGeneration)roomBusy=false;}
+}
+function joinByCode(){
+ if(!onlineSupported){roomMessage('当前是本地预览。请从游戏网址打开好友房。');return;}
+ roomForm('加入好友房','输入朋友发来的 6 位数字房间号。','code',inspectRoom);
+}
+async function enterRoom(action,code,password){
  if(!onlineSupported){roomMessage('当前是本地文件预览。请通过联机服务器网址打开，再创建好友房。');return;}
  if(roomBusy)return;
  roomBusy=true;roomMessage(action==='create'?'正在创建房间…':'正在加入房间…');
  try{
-  const data=await roomCall({action,code});
+  const data=await roomCall({action,code,password});
   if(!roomBusy){await roomCall({action:'leave',code:data.code,token:data.token});return;}
   attachRoom(data);
- }catch(error){if(roomBusy)roomMessage(error.message||'房间服务器暂时无法连接。');}
+ }catch(error){
+  if(roomBusy){
+   if(action==='join'&&error.status===403)openListedRoom({code,locked:true},error.message);
+   else roomMessage(error.message||'房间服务器暂时无法连接。');
+  }
+ }
  finally{roomBusy=false;}
 }
 function attachRoom(data){
@@ -1007,7 +1092,10 @@ function renderRoom(data){
    c.view=view;
    const waiting=!data.players[1]?'等待好友加入':mine?'等待对方准备':'两人准备后自动开局';
    panel(waiting,'房间 '+data.code,[ [mine?'取消准备':'准备',()=>roomCommand('ready',{ready:!mine})],
-    ['复制邀请链接',async()=>{
+    ['复制房间号',async()=>{
+     try{await navigator.clipboard.writeText(data.code);el('title').textContent='已复制房间号 '+data.code;}
+     catch{el('title').textContent='请记下房间号 '+data.code;}
+    }],['复制邀请链接',async()=>{
      try{await navigator.clipboard.writeText(location.href);el('title').textContent='邀请链接已复制';}
      catch{el('title').textContent='复制浏览器地址发给好友';}
     }],['离开房间',()=>roomCommand('leave')] ]);
@@ -1062,7 +1150,7 @@ async function restoreRoom(){
   try{attachRoom({...await roomCall({action:'poll',code,token:previous.token}),token:previous.token});return;}
   catch{sessionStorage.removeItem('animal-duel-room');}
  }
- panel('加入好友房','房间 '+code,[['加入房间',()=>enterRoom('join',code)],['返回主界面',()=>roomHome()]]);
+ panel('加入好友房','房间 '+code,[['加入房间',()=>inspectRoom(code)],['返回主界面',()=>roomHome()]]);
 }
 
 menu();hud();restoreRoom();

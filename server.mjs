@@ -1,5 +1,5 @@
 import {createServer} from 'node:http';
-import {createHash, randomBytes, randomInt} from 'node:crypto';
+import {createHash, randomBytes, randomInt, timingSafeEqual} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {createContext, Script} from 'node:vm';
 import {pathToFileURL} from 'node:url';
@@ -41,10 +41,18 @@ function initMatch() {
   return sandbox.matchEngine;
 }
 const rooms = new Map();
-const codes = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
 const roomLifetime = 30 * 60_000;
 const disconnectLimit = 15_000;
 const neutral = [false,false,false,false];
+function passwordDigest(salt,password){
+  return createHash('sha256').update(salt).update(password).digest();
+}
+function roomListing(){
+  const now=Date.now();
+  return [...rooms.values()].filter(r=>r.phase==='lobby'&&!r.seats[1]&&now-r.seats[0].seen<disconnectLimit)
+    .reverse().slice(0,30).map(r=>({code:r.code,locked:Boolean(r.password)}));
+}
 function seat() {
   return {token:randomBytes(24).toString('base64url'),ready:false,seen:Date.now(),input:neutral,pressed:[...neutral]};
 }
@@ -159,21 +167,35 @@ export async function handleRequest(req,res){
       res.writeHead(200,headers);
       res.end(html);return;
     }
+    if(req.method==='GET'&&url.pathname==='/api/rooms')return send(res,200,{rooms:roomListing()});
     if(req.method!=='POST'||url.pathname!=='/api/room')return send(res,404,{error:'找不到页面'});
     const request=await body(req);
     if(request.action==='create'){
       if(rooms.size>=100)return send(res,503,{error:'房间已满，请稍后再试'});
+      const password=typeof request.password==='string'?request.password.trim():'';
+      if(password.length>32)return send(res,400,{error:'密码最多 32 个字符'});
       let code;
-      do{code=Array.from({length:6},()=>codes[randomInt(codes.length)]).join('')}while(rooms.has(code));
+      do{code=String(randomInt(100000,1000000));}while(rooms.has(code));
       const host=seat();
-      const room={code,seats:[host,null],phase:'lobby',updated:Date.now(),events:[],eventId:0,pushTick:0,game:null,result:null};
+      const salt=password?randomBytes(16):null;
+      const room={code,salt,password:password?passwordDigest(salt,password):null,seats:[host,null],phase:'lobby',updated:Date.now(),events:[],eventId:0,pushTick:0,game:null,result:null};
       rooms.set(code,room);
       return send(res,200,{...visible(room,0,0),token:host.token});
     }
     const room=rooms.get(String(request.code??'').toUpperCase());
     if(!room)return send(res,404,{error:'房间不存在或已关闭'});
+    if(request.action==='inspect'){
+      if(room.phase!=='lobby'||room.seats[1])return send(res,409,{error:'房间已满或已开局'});
+      return send(res,200,{code:room.code,locked:Boolean(room.password)});
+    }
     if(request.action==='join'){
       if(room.phase!=='lobby'||room.seats[1])return send(res,409,{error:'房间已满或已开局'});
+      if(room.password){
+        const password=typeof request.password==='string'?request.password.trim():'';
+        if(!password||password.length>32||!timingSafeEqual(room.password,passwordDigest(room.salt,password))){
+          return send(res,403,{error:'密码不正确，请重试'});
+        }
+      }
       const guest=seat();room.seats[1]=guest;room.updated=Date.now();publish(room);
       return send(res,200,{...visible(room,1,0),token:guest.token});
     }
